@@ -1,0 +1,1 @@
+{"_timestamp":1.7709162043371418e+09,"_step":2000,"_wandb":{"runtime":11},"_runtime":11.8561996,"step":2000,"avg_reward":1.3648012683002873,"optimal_action_pct":66.5,"cumulative_regret":253.29929939439046}

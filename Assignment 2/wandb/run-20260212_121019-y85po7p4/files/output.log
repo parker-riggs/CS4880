@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\KArmedBandits.py", line 197, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\KArmedBandits.py", line 191, in main
+    run_experiments(args)
+    ~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\KArmedBandits.py", line 144, in run_experiments
+    rewards, optimal_hits, cumulative_regret = simulate_config(cfg)
+                                               ~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\KArmedBandits.py", line 97, in simulate_config
+    cumulative_regret[t] += regret
+    ~~~~~~~~~~~~~~~~~^^^
+KeyboardInterrupt

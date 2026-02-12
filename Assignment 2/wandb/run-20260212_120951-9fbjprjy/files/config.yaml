@@ -1,0 +1,61 @@
+_wandb:
+    value:
+        cli_version: 0.24.0
+        e:
+            47ufbbgt7tsqpegj9vcs9bihgqfjwpz9:
+                args:
+                    - --wandb-project
+                    - KArmedBandits
+                codePath: KArmedBandits.py
+                codePathLocal: KArmedBandits.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                disk:
+                    /:
+                        total: "511264681984"
+                        used: "254142996480"
+                email: pr881922@ohio.edu
+                executable: C:\Users\prigg\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe
+                git:
+                    remote: https://github.com/parker-riggs/CS4880.git
+                host: DESKTOP-HBPM37U
+                memory:
+                    total: "12163739648"
+                os: Windows-10-10.0.19045-SP0
+                program: C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\KArmedBandits.py
+                python: CPython 3.13.9
+                root: C:\Users\prigg\OneDrive\Documents\GitHub\CS4880
+                startedAt: "2026-02-12T17:09:51.975069Z"
+                writerId: 47ufbbgt7tsqpegj9vcs9bihgqfjwpz9
+        m: []
+        python_version: 3.13.9
+        t:
+            "3":
+                - 2
+                - 13
+                - 16
+                - 61
+            "4": 3.13.9
+            "5": 0.24.0
+            "8":
+                - 3
+            "10":
+                - 20
+            "12": 0.24.0
+            "13": windows-amd64
+alpha_mode:
+    value: sample
+constant_alpha:
+    value: 0.1
+epsilon:
+    value: 0
+initial_value:
+    value: 5
+k_arms:
+    value: 10
+runs:
+    value: 200
+seed:
+    value: 1
+steps:
+    value: 2000

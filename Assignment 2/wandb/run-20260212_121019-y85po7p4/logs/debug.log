@@ -1,0 +1,16 @@
+2026-02-12 12:10:19,207 INFO    MainThread:18552 [wandb_init.py:setup_run_log_directory():717] Logging user logs to C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\wandb\run-20260212_121019-y85po7p4\logs\debug.log
+2026-02-12 12:10:19,207 INFO    MainThread:18552 [wandb_init.py:setup_run_log_directory():718] Logging internal logs to C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\wandb\run-20260212_121019-y85po7p4\logs\debug-internal.log
+2026-02-12 12:10:19,207 INFO    MainThread:18552 [wandb_init.py:init():844] calling init triggers
+2026-02-12 12:10:19,207 INFO    MainThread:18552 [wandb_init.py:init():849] wandb.init called with sweep_config: {}
+config: {'k_arms': 10, 'steps': 2000, 'runs': 200, 'epsilon': 0.01, 'initial_value': 0.0, 'alpha_mode': 'sample', 'constant_alpha': 0.1, 'seed': 1, '_wandb': {}}
+2026-02-12 12:10:19,221 INFO    MainThread:18552 [wandb_init.py:init():892] starting backend
+2026-02-12 12:10:19,221 INFO    MainThread:18552 [wandb_init.py:init():895] sending inform_init request
+2026-02-12 12:10:19,224 INFO    MainThread:18552 [wandb_init.py:init():903] backend started and connected
+2026-02-12 12:10:19,225 INFO    MainThread:18552 [wandb_init.py:init():973] updated telemetry
+2026-02-12 12:10:19,229 INFO    MainThread:18552 [wandb_init.py:init():997] communicating run to backend with 90.0 second timeout
+2026-02-12 12:10:19,760 INFO    MainThread:18552 [wandb_init.py:init():1044] starting run threads in backend
+2026-02-12 12:10:19,956 INFO    MainThread:18552 [wandb_run.py:_console_start():2529] atexit reg
+2026-02-12 12:10:19,956 INFO    MainThread:18552 [wandb_run.py:_redirect():2377] redirect: wrap_raw
+2026-02-12 12:10:19,956 INFO    MainThread:18552 [wandb_run.py:_redirect():2446] Wrapping output streams.
+2026-02-12 12:10:19,956 INFO    MainThread:18552 [wandb_run.py:_redirect():2469] Redirects installed.
+2026-02-12 12:10:19,958 INFO    MainThread:18552 [wandb_init.py:init():1084] run started, returning control to user process

@@ -1,0 +1,12 @@
+{"time":"2026-02-12T12:10:06.2456717-05:00","level":"INFO","msg":"stream: starting","core version":"0.24.0"}
+{"time":"2026-02-12T12:10:06.522654-05:00","level":"INFO","msg":"stream: created new stream","id":"i2jnbdwn"}
+{"time":"2026-02-12T12:10:06.523205-05:00","level":"INFO","msg":"handler: started","stream_id":"i2jnbdwn"}
+{"time":"2026-02-12T12:10:06.5257051-05:00","level":"INFO","msg":"stream: started","id":"i2jnbdwn"}
+{"time":"2026-02-12T12:10:06.5257226-05:00","level":"INFO","msg":"sender: started","stream_id":"i2jnbdwn"}
+{"time":"2026-02-12T12:10:06.5257226-05:00","level":"INFO","msg":"writer: started","stream_id":"i2jnbdwn"}
+{"time":"2026-02-12T12:10:17.5685371-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-02-12T12:10:18.5079569-05:00","level":"INFO","msg":"handler: operation stats","stats":{}}
+{"time":"2026-02-12T12:10:18.5162275-05:00","level":"INFO","msg":"stream: closing","id":"i2jnbdwn"}
+{"time":"2026-02-12T12:10:18.5162275-05:00","level":"INFO","msg":"handler: closed","stream_id":"i2jnbdwn"}
+{"time":"2026-02-12T12:10:18.5167424-05:00","level":"INFO","msg":"sender: closed","stream_id":"i2jnbdwn"}
+{"time":"2026-02-12T12:10:18.5167424-05:00","level":"INFO","msg":"stream: closed","id":"i2jnbdwn"}

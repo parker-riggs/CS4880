@@ -1,0 +1,21 @@
+2026-02-12 12:10:06,226 INFO    MainThread:18552 [wandb_init.py:setup_run_log_directory():717] Logging user logs to C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\wandb\run-20260212_121006-i2jnbdwn\logs\debug.log
+2026-02-12 12:10:06,227 INFO    MainThread:18552 [wandb_init.py:setup_run_log_directory():718] Logging internal logs to C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\wandb\run-20260212_121006-i2jnbdwn\logs\debug-internal.log
+2026-02-12 12:10:06,228 INFO    MainThread:18552 [wandb_init.py:init():844] calling init triggers
+2026-02-12 12:10:06,228 INFO    MainThread:18552 [wandb_init.py:init():849] wandb.init called with sweep_config: {}
+config: {'k_arms': 10, 'steps': 2000, 'runs': 200, 'epsilon': 0.01, 'initial_value': 0.0, 'alpha_mode': 'constant', 'constant_alpha': 0.1, 'seed': 1, '_wandb': {}}
+2026-02-12 12:10:06,239 INFO    MainThread:18552 [wandb_init.py:init():892] starting backend
+2026-02-12 12:10:06,240 INFO    MainThread:18552 [wandb_init.py:init():895] sending inform_init request
+2026-02-12 12:10:06,243 INFO    MainThread:18552 [wandb_init.py:init():903] backend started and connected
+2026-02-12 12:10:06,245 INFO    MainThread:18552 [wandb_init.py:init():973] updated telemetry
+2026-02-12 12:10:06,251 INFO    MainThread:18552 [wandb_init.py:init():997] communicating run to backend with 90.0 second timeout
+2026-02-12 12:10:06,832 INFO    MainThread:18552 [wandb_init.py:init():1044] starting run threads in backend
+2026-02-12 12:10:07,025 INFO    MainThread:18552 [wandb_run.py:_console_start():2529] atexit reg
+2026-02-12 12:10:07,025 INFO    MainThread:18552 [wandb_run.py:_redirect():2377] redirect: wrap_raw
+2026-02-12 12:10:07,025 INFO    MainThread:18552 [wandb_run.py:_redirect():2446] Wrapping output streams.
+2026-02-12 12:10:07,026 INFO    MainThread:18552 [wandb_run.py:_redirect():2469] Redirects installed.
+2026-02-12 12:10:07,027 INFO    MainThread:18552 [wandb_init.py:init():1084] run started, returning control to user process
+2026-02-12 12:10:16,805 INFO    MainThread:18552 [wandb_run.py:_finish():2295] finishing run pr881922-ohio-university/KArmedBandits/i2jnbdwn
+2026-02-12 12:10:16,805 INFO    MainThread:18552 [wandb_run.py:_atexit_cleanup():2494] got exitcode: 0
+2026-02-12 12:10:16,806 INFO    MainThread:18552 [wandb_run.py:_restore():2476] restore
+2026-02-12 12:10:16,806 INFO    MainThread:18552 [wandb_run.py:_restore():2482] restore done
+2026-02-12 12:10:18,514 INFO    MainThread:18552 [wandb_run.py:_footer_sync_info():3870] logging synced files
