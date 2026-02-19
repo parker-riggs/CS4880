@@ -1,0 +1,80 @@
+MATCH UP: RandomBiasedAI vs AdaptiveRushBot
+Winner: 1  in 569 cycles
+RandomBiasedAI : null
+AdaptiveRushBot : null
+MATCH UP: RandomBiasedAI vs AdaptiveRushBot
+Winner: 1  in 489 cycles
+RandomBiasedAI : null
+AdaptiveRushBot : null
+MATCH UP: RandomBiasedAI vs AdaptiveRushBot
+Winner: 1  in 528 cycles
+RandomBiasedAI : null
+AdaptiveRushBot : null
+MATCH UP: PseudoContinuingAI(WorkerRush(FloodFillPathFinding)) vs AdaptiveRushBot
+Winner: 0  in 290 cycles
+PseudoContinuingAI(WorkerRush(FloodFillPathFinding)) : null
+AdaptiveRushBot : null
+MATCH UP: PseudoContinuingAI(WorkerRush(FloodFillPathFinding)) vs AdaptiveRushBot
+Winner: 0  in 290 cycles
+PseudoContinuingAI(WorkerRush(FloodFillPathFinding)) : null
+AdaptiveRushBot : null
+MATCH UP: PseudoContinuingAI(WorkerRush(FloodFillPathFinding)) vs AdaptiveRushBot
+Winner: 0  in 290 cycles
+PseudoContinuingAI(WorkerRush(FloodFillPathFinding)) : null
+AdaptiveRushBot : null
+MATCH UP: PseudoContinuingAI(LightRush(FloodFillPathFinding)) vs AdaptiveRushBot
+Winner: 1  in 220 cycles
+PseudoContinuingAI(LightRush(FloodFillPathFinding)) : null
+AdaptiveRushBot : null
+MATCH UP: PseudoContinuingAI(LightRush(FloodFillPathFinding)) vs AdaptiveRushBot
+Winner: 1  in 220 cycles
+PseudoContinuingAI(LightRush(FloodFillPathFinding)) : null
+AdaptiveRushBot : null
+MATCH UP: PseudoContinuingAI(LightRush(FloodFillPathFinding)) vs AdaptiveRushBot
+Winner: 1  in 220 cycles
+PseudoContinuingAI(LightRush(FloodFillPathFinding)) : null
+AdaptiveRushBot : null
+MATCH UP: ContinuingAI(NaiveMCTS(100, -1, 100,10,0.33, 1.0, 0.0, 1.0, 0.75, 1.0, RandomBiasedAI, SimpleEvaluationFunction)) vs AdaptiveRushBot
+Winner: 1  in 1087 cycles
+ContinuingAI(NaiveMCTS(100, -1, 100,10,0.33, 1.0, 0.0, 1.0, 0.75, 1.0, RandomBiasedAI, SimpleEvaluationFunction)) : Total runs: 720561, runs per action: 5810.9756, runs per cycle: 1138.327, average time per cycle: 100.229065, max branching factor: 720
+AdaptiveRushBot : null
+MATCH UP: ContinuingAI(NaiveMCTS(100, -1, 100,10,0.33, 1.0, 0.0, 1.0, 0.75, 1.0, RandomBiasedAI, SimpleEvaluationFunction)) vs AdaptiveRushBot
+Winner: 1  in 644 cycles
+ContinuingAI(NaiveMCTS(100, -1, 100,10,0.33, 1.0, 0.0, 1.0, 0.75, 1.0, RandomBiasedAI, SimpleEvaluationFunction)) : Total runs: 315442, runs per action: 4779.4243, runs per cycle: 878.6685, average time per cycle: 100.139275, max branching factor: 28
+AdaptiveRushBot : null
+MATCH UP: ContinuingAI(NaiveMCTS(100, -1, 100,10,0.33, 1.0, 0.0, 1.0, 0.75, 1.0, RandomBiasedAI, SimpleEvaluationFunction)) vs AdaptiveRushBot
+Winner: 1  in 215 cycles
+ContinuingAI(NaiveMCTS(100, -1, 100,10,0.33, 1.0, 0.0, 1.0, 0.75, 1.0, RandomBiasedAI, SimpleEvaluationFunction)) : Total runs: 160561, runs per action: 7298.227, runs per cycle: 912.2784, average time per cycle: 100.232956, max branching factor: 28
+AdaptiveRushBot : null
+Notice that the results below are only from the perspective of the 'bots1' list.
+If you want a symmetric experimentation, use the 'Experimenter' class
+Wins: 
+0, 
+3, 
+0, 
+0, 
+Ties: 
+0, 
+0, 
+0, 
+0, 
+Loses: 
+3, 
+0, 
+3, 
+3, 
+Win average time: 
+-, 
+290.0, 
+-, 
+-, 
+Tie average time: 
+-, 
+-, 
+-, 
+-, 
+Lose average time: 
+528.6666666666666, 
+-, 
+220.0, 
+648.6666666666666, 

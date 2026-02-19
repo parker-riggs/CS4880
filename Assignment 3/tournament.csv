@@ -1,0 +1,5 @@
+"Bot","Opponent","Wins","Ties","Losses","Games","WinRatePercent"
+"AdaptiveRushBot","RandomBiasedAI","0","0","3","3","0"
+"AdaptiveRushBot","WorkerRush","3","0","0","3","100"
+"AdaptiveRushBot","LightRush","0","0","3","3","0"
+"AdaptiveRushBot","NaiveMCTS3","0","0","3","3","0"
