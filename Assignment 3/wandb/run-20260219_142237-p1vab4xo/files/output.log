@@ -1,0 +1,66 @@
+Traceback (most recent call last):
+  File "C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\Assignment 3\resultsWandB.py", line 127, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\Assignment 3\resultsWandB.py", line 118, in main
+    log_rows_and_summary(run, rows)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\prigg\OneDrive\Documents\GitHub\CS4880\Assignment 3\resultsWandB.py", line 62, in log_rows_and_summary
+    run.log({"tournament_table": table})
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\wandb_run.py", line 400, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\wandb_run.py", line 458, in wrapper_fn
+    return func(self, *args, **kwargs)
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\wandb_run.py", line 445, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\wandb_run.py", line 2042, in log
+    self._log(data=data, step=step, commit=commit)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\wandb_run.py", line 1753, in _log
+    self._partial_history_callback(data, step, commit)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\wandb_run.py", line 400, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\wandb_run.py", line 1581, in _partial_history_callback
+    self._backend.interface.publish_partial_history(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self,
+        ^^^^^
+    ...<4 lines>...
+        publish_step=not_using_tensorboard,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\interface\interface.py", line 689, in publish_partial_history
+    data = history_dict_to_json(run, data, step=user_step, ignore_copy_err=True)
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\data_types\utils.py", line 54, in history_dict_to_json
+    payload[key] = val_to_json(
+                   ~~~~~~~~~~~^
+        run, key, val, namespace=step, ignore_copy_err=ignore_copy_err
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\sdk\data_types\utils.py", line 84, in val_to_json
+    if util.is_pandas_data_frame(val):
+       ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\wandb\util.py", line 488, in is_pandas_data_frame
+    import pandas as pd
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\__init__.py", line 46, in <module>
+    from pandas._config import (
+    ...<6 lines>...
+    )
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\_config\__init__.py", line 19, in <module>
+    from pandas._config import config
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\_config\config.py", line 63, in <module>
+    from pandas._typing import F
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\_typing.py", line 200, in <module>
+    | np.random.Generator
+      ^^^^^^^^^
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\numpy\__init__.py", line 353, in __getattr__
+    import numpy.random as random
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\numpy\random\__init__.py", line 180, in <module>
+    from . import _pickle
+  File "C:\Users\prigg\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\numpy\random\_pickle.py", line 4, in <module>
+    from ._pcg64 import PCG64, PCG64DXSM
+KeyboardInterrupt

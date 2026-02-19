@@ -25,3 +25,19 @@ This keeps the implementation simple while making behavior more adaptive than a 
 2. Build MicroRTS.
 3. Set your bot class in your run config / benchmark config as:
     - `ai.abstraction.AdaptiveRushBot`
+
+## Upload results to WandB
+
+After generating `tournament.csv` and `results.txt`, upload them with:
+
+1. Install WandB:
+    - `python -m pip install wandb`
+2. Login to WandB (one-time):
+    - `wandb login`
+3. Run uploader from this folder:
+    - `python upload_results_to_wandb.py --csv tournament.csv --raw results.txt --project CS4880-PA3 --run-name AdaptiveRushBot-fast`
+
+The script logs:
+- a results table (opponent, wins/ties/losses, win rate)
+- summary metrics (overall wins/losses/win rate)
+- both files as a WandB artifact for your report link

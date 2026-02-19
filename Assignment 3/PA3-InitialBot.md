@@ -75,5 +75,6 @@
 
 * Parker Riggs
   * Key-idea: modified built-in scripted bots by creating an adaptive policy that starts with WorkerRush and transitions to LightRush using simple game-state signals like time, unit counts, and nearby enemy pressure.
-  * [Code]()
-  * [Results]()
+  * [Code](https://github.com/parker-riggs/CS4880/blob/main/Assignment%203/AdaptiveRushBot.java)
+  * [Results](https://github.com/parker-riggs/CS4880/blob/main/Assignment%203/tournament.csv)
+  * [WandB](https://wandb.ai/pr881922-ohio-university/CS4880-PA3/runs/m9t8d378)

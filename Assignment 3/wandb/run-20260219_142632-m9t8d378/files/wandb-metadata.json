@@ -1,0 +1,38 @@
+{
+  "os":  "Windows-10-10.0.19045-SP0",
+  "python":  "CPython 3.13.12",
+  "startedAt":  "2026-02-19T19:26:32.043664Z",
+  "args":  [
+    "--csv",
+    ".\\tournament.csv",
+    "--raw",
+    ".\\results.txt",
+    "--project",
+    "CS4880-PA3",
+    "--run-name",
+    "AdaptiveRushBot-diagrams"
+  ],
+  "program":  "C:\\Users\\prigg\\OneDrive\\Documents\\GitHub\\CS4880\\Assignment 3\\resultsWandB.py",
+  "codePath":  "Assignment 3\\resultsWandB.py",
+  "codePathLocal":  "resultsWandB.py",
+  "git":  {
+    "remote":  "https://github.com/parker-riggs/CS4880.git",
+    "commit":  "65c825961f7b4988789c2d224cd8e7fc6fbfdcff"
+  },
+  "email":  "pr881922@ohio.edu",
+  "root":  "C:\\Users\\prigg\\OneDrive\\Documents\\GitHub\\CS4880\\Assignment 3",
+  "host":  "DESKTOP-HBPM37U",
+  "executable":  "C:\\Users\\prigg\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+  "cpu_count":  8,
+  "cpu_count_logical":  16,
+  "disk":  {
+    "/":  {
+      "total":  "511264681984",
+      "used":  "276539293696"
+    }
+  },
+  "memory":  {
+    "total":  "12163739648"
+  },
+  "writerId":  "yl2u20qv4ut2aa53ugkqe82pqbocxgyx"
+}
