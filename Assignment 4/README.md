@@ -16,15 +16,17 @@
   - Evaluation cache for repeated board states during search
   - CLI for selecting a move from a given board state
 
-## Part 1 scope
+## Scope
 
-In this version, the **Simulation/Evaluation** phase uses an LLM value estimate rather than random rollouts.
+This implementation now includes both:
 
-- For a non-terminal leaf state, the evaluator returns a value in `[0, 1]` representing win probability for the side to move.
-- The value is converted to root-player perspective and backpropagated through the tree.
-- Terminal states are scored exactly (`1.0` win, `0.0` loss, `0.5` draw).
+- **Baseline MCTS** with standard random rollouts in Simulation.
+- **LLM-guided MCTS** where Simulation/Evaluation uses an LLM (or heuristic fallback) value estimate.
 
-No experiment harness, charting, or analysis write-up is included here (those are outside Part 1).
+- It supports controlled comparison over fixed iteration counts (for example `10,50,100,500`), tracks win/draw/loss, per-move chosen value estimate, and time-per-iteration.
+- Optional minimax benchmarking is included.
+
+The script defaults to **comparison mode** for assignment experiments.
 
 ## How to run
 
@@ -51,17 +53,29 @@ For full smoke tests:
 ./test_all.ps1 -IncludeOllama
 ```
 
-### 1) Offline mode (no API required)
+### 1) Compare mode (default, assignment experiments)
 
 ```powershell
-python llm_guided_mcts.py --player X --provider heuristic --iterations 200
+python llm_guided_mcts.py --provider heuristic --iteration-grid 10,50,100,500 --games 20
 ```
 
-### 2) Gemini Flash mode
+Optional:
+
+```powershell
+python llm_guided_mcts.py --provider heuristic --iteration-grid 10,50,100,500 --games 20 --include-minimax --output-json results.json
+```
+
+### 2) Single move mode (one board position, one chosen move)
+
+```powershell
+python llm_guided_mcts.py --mode single --player X --provider heuristic --iterations 200
+```
+
+### 3) Gemini Flash mode
 
 ```powershell
 $env:GEMINI_API_KEY="YOUR_KEY"
-python llm_guided_mcts.py --player X --provider gemini --model gemini-2.0-flash --max-tokens 8192 --iterations 200
+python llm_guided_mcts.py --mode single --player X --provider gemini --model gemini-2.0-flash --max-tokens 8192 --iterations 200
 ```
 
 Optional Gemini args:
@@ -77,10 +91,10 @@ You can also use wrappers with custom args, for example:
 ./run.ps1 -Provider gemini -Player O -Iterations 300 -Board "XO...O..."
 ```
 
-### 3) Ollama mode
+### 4) Ollama mode
 
 ```powershell
-python llm_guided_mcts.py --player X --provider ollama --model llama3.1 --base-url http://localhost:11434/api/generate --iterations 200
+python llm_guided_mcts.py --mode single --player X --provider ollama --model llama3.1 --base-url http://localhost:11434/api/generate --iterations 200
 ```
 
 ## Input format
@@ -94,7 +108,14 @@ Example board:
 
 ## Output
 
-The script prints:
+In compare mode, the script prints:
+
+- Per-iteration comparison rows for baseline vs LLM-guided MCTS
+- Win/draw/loss summary
+- Average chosen move value and average time-per-iteration
+- Opening move quality versus minimax value
+
+In single mode, the script prints:
 
 - Input board (pretty 3×3 text)
 - Player to move
