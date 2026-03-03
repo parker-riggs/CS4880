@@ -18,19 +18,35 @@ Move = Tuple[int, int]
 
 
 def other_player(player: Player) -> Player:
+    """Return the opposing Tic-Tac-Toe symbol."""
     return "O" if player == "X" else "X"
 
 
 @dataclass(frozen=True)
 class Board:
+    """
+    Immutable 3x3 Tic-Tac-Toe board.
+
+    The board is stored as a flat tuple of length 9 in row-major order:
+    indices 0..2 are the first row, 3..5 second row, 6..8 third row.
+    Each cell is one of: "X", "O", or " " (space for empty).
+    """
     cells: Tuple[str, ...]
 
     @staticmethod
     def empty() -> "Board":
+        """Create a brand-new empty board."""
         return Board(tuple(" " for _ in range(9)))
 
     @staticmethod
     def from_text(text: str) -> "Board":
+        """
+        Parse a board from user text.
+
+        Accepted symbols:
+        - X, O for occupied cells
+        - _, -, ., or space for empty cells
+        """
         cleaned = [char for char in text if char in {"X", "O", "_", "-", ".", " "}]
         if len(cleaned) != 9:
             raise ValueError(
@@ -40,9 +56,11 @@ class Board:
         return Board(normalized)
 
     def to_key(self) -> str:
+        """Serialize board to a compact cache key string."""
         return "".join(self.cells)
 
     def to_pretty(self) -> str:
+        """Render board as a human-readable 3-line string using '.' for empties."""
         out: List[str] = []
         for row in range(3):
             segment = []
@@ -53,6 +71,7 @@ class Board:
         return "\n".join(out)
 
     def legal_moves(self) -> List[Move]:
+        """Return all currently empty coordinates as (row, col) pairs."""
         moves: List[Move] = []
         for index, value in enumerate(self.cells):
             if value == " ":
@@ -60,6 +79,7 @@ class Board:
         return moves
 
     def apply_move(self, move: Move, player: Player) -> "Board":
+        """Return a new board after placing `player` at `move`."""
         row, col = move
         if not (0 <= row < 3 and 0 <= col < 3):
             raise ValueError(f"Invalid move {move}; expected row/col in [0,2].")
@@ -71,6 +91,7 @@ class Board:
         return Board(tuple(mutable))
 
     def winner(self) -> Optional[Player]:
+        """Return winner symbol if there is a 3-in-a-row, otherwise None."""
         lines = [
             (0, 1, 2),
             (3, 4, 5),
@@ -87,18 +108,31 @@ class Board:
         return None
 
     def is_full(self) -> bool:
+        """True when no empty cells remain."""
         return all(value != " " for value in self.cells)
 
     def is_terminal(self) -> bool:
+        """True when game is over via win or draw."""
         return self.winner() is not None or self.is_full()
 
 
 class LLMEvaluator:
+    """Interface for value estimators that score a board for current player to move."""
+
     def evaluate(self, board: Board, player_to_move: Player) -> float:
+        """Return probability in [0,1] that `player_to_move` eventually wins."""
         raise NotImplementedError
 
 
 class HeuristicFallbackEvaluator(LLMEvaluator):
+    """
+    Deterministic local evaluator used when no external model is available.
+
+    This is intentionally lightweight: terminal outcomes are exact, non-terminal
+    states are scored using center control + corner count to give a directional
+    prior for MCTS leaf evaluation.
+    """
+
     def evaluate(self, board: Board, player_to_move: Player) -> float:
         winner = board.winner()
         if winner == player_to_move:
@@ -120,11 +154,19 @@ class HeuristicFallbackEvaluator(LLMEvaluator):
             1 for idx in corners if board.cells[idx] == other_player(player_to_move)
         )
 
+        # Baseline 0.5 means equal position; apply small strategic bonuses.
         score = 0.5 + center_bonus + (0.03 * corner_score)
         return max(0.0, min(1.0, score))
 
 
 class GeminiEvaluator(LLMEvaluator):
+    """
+    Remote evaluator backed by Google Gemini GenerateContent API.
+
+    If networking/parsing fails, the class gracefully falls back to the local
+    heuristic evaluator so experiments can still run end-to-end.
+    """
+
     def __init__(
         self,
         model: str,
@@ -143,6 +185,7 @@ class GeminiEvaluator(LLMEvaluator):
         self.fallback = HeuristicFallbackEvaluator()
 
     def _prompt(self, board: Board, player_to_move: Player) -> str:
+        """Build a strict prompt that requests JSON-only scalar output."""
         return (
             "Evaluate this Tic-Tac-Toe position.\n"
             "Board uses X, O, and . for empty.\n"
@@ -153,6 +196,7 @@ class GeminiEvaluator(LLMEvaluator):
         )
 
     def _extract_value(self, text: str) -> Optional[float]:
+        """Parse and clamp a numeric value from model output; return None on failure."""
         candidate = text.strip()
         if "{" in candidate and "}" in candidate:
             start = candidate.find("{")
@@ -167,6 +211,7 @@ class GeminiEvaluator(LLMEvaluator):
             return None
 
     def evaluate(self, board: Board, player_to_move: Player) -> float:
+        """Query Gemini for state value, with exact handling for terminal states first."""
         winner = board.winner()
         if winner == player_to_move:
             return 1.0
@@ -193,6 +238,7 @@ class GeminiEvaluator(LLMEvaluator):
         )
 
         try:
+            # Parse API response shape: candidates[0].content.parts[0].text
             with urllib.request.urlopen(request, timeout=self.timeout_sec) as response:
                 body = response.read().decode("utf-8")
             parsed = json.loads(body)
@@ -203,10 +249,18 @@ class GeminiEvaluator(LLMEvaluator):
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, KeyError, IndexError, json.JSONDecodeError):
             pass
 
+        # Robust fallback keeps experiments deterministic even if API is unavailable.
         return self.fallback.evaluate(board, player_to_move)
 
 
 class OllamaEvaluator(LLMEvaluator):
+    """
+    Local/remote evaluator backed by Ollama's /api/generate endpoint.
+
+    Expects JSON output from the model and falls back to heuristic scoring when
+    endpoint/model output is malformed or unreachable.
+    """
+
     def __init__(
         self,
         model: str,
@@ -219,6 +273,7 @@ class OllamaEvaluator(LLMEvaluator):
         self.fallback = HeuristicFallbackEvaluator()
 
     def _prompt(self, board: Board, player_to_move: Player) -> str:
+        """Prompt tuned for JSON-only response from an Ollama model."""
         return (
             "You are evaluating Tic-Tac-Toe.\n"
             "Given this board and side to move, return only JSON: {\"value\": number}\n"
@@ -228,6 +283,7 @@ class OllamaEvaluator(LLMEvaluator):
         )
 
     def evaluate(self, board: Board, player_to_move: Player) -> float:
+        """Query Ollama and parse nested JSON payload safely."""
         winner = board.winner()
         if winner == player_to_move:
             return 1.0
@@ -254,6 +310,7 @@ class OllamaEvaluator(LLMEvaluator):
             with urllib.request.urlopen(request, timeout=self.timeout_sec) as response:
                 body = response.read().decode("utf-8")
             parsed = json.loads(body)
+            # Ollama returns model text in 'response'; that text itself is JSON.
             response_text = parsed.get("response", "")
             nested = json.loads(response_text)
             value = float(nested["value"])
@@ -264,6 +321,13 @@ class OllamaEvaluator(LLMEvaluator):
 
 @dataclass
 class MCTSNode:
+    """
+    Tree node used by MCTS.
+
+    Statistics (`visits`, `value_sum`) are always maintained from the root
+    player's perspective to keep UCB selection and backpropagation consistent.
+    """
+
     board: Board
     player_to_move: Player
     parent: Optional["MCTSNode"] = None
@@ -274,27 +338,41 @@ class MCTSNode:
     value_sum: float = 0.0
 
     def __post_init__(self) -> None:
+        """Initialize expansion frontier with all legal moves for this position."""
         if not self.untried_moves:
             self.untried_moves = self.board.legal_moves()
 
     def average_value(self) -> float:
+        """Empirical mean value from simulations passing through this node."""
         if self.visits == 0:
             return 0.0
         return self.value_sum / self.visits
 
     def is_terminal(self) -> bool:
+        """True when no further moves should be expanded from this node."""
         return self.board.is_terminal()
 
     def is_fully_expanded(self) -> bool:
+        """True when every legal move has already been converted to a child node."""
         return len(self.untried_moves) == 0
 
 
 class MCTSAgent:
+    """Interface for agents that choose one move and return telemetry stats."""
+
     def choose_move(self, board: Board, player_to_move: Player) -> Tuple[Move, Dict[str, float]]:
         raise NotImplementedError
 
 
 class BaseMCTS(MCTSAgent):
+    """
+    Shared MCTS skeleton implementing selection/expansion/backpropagation.
+
+    Subclasses only define leaf evaluation policy:
+    - `RandomRolloutMCTS`: simulate random playouts
+    - `LLMGuidedMCTS`: call evaluator at frontier state
+    """
+
     def __init__(
         self,
         iterations: int = 200,
@@ -308,6 +386,7 @@ class BaseMCTS(MCTSAgent):
         self.rng = random.Random(seed)
 
     def _ucb_score(self, parent_visits: int, child: MCTSNode) -> float:
+        """Upper Confidence Bound score used for tree policy selection."""
         if child.visits == 0:
             return float("inf")
         exploitation = child.average_value()
@@ -315,6 +394,7 @@ class BaseMCTS(MCTSAgent):
         return exploitation + exploration
 
     def _select(self, node: MCTSNode) -> MCTSNode:
+        """Walk down tree by UCB until reaching expandable or terminal node."""
         current = node
         while not current.is_terminal() and current.is_fully_expanded() and current.children:
             parent_visits = max(current.visits, 1)
@@ -322,6 +402,7 @@ class BaseMCTS(MCTSAgent):
         return current
 
     def _expand(self, node: MCTSNode) -> MCTSNode:
+        """Add one random unexpanded child and return it (or node if not expandable)."""
         if node.is_terminal() or not node.untried_moves:
             return node
         move = self.rng.choice(node.untried_moves)
@@ -337,9 +418,11 @@ class BaseMCTS(MCTSAgent):
         return child
 
     def _evaluate_leaf(self, node: MCTSNode, root_player: Player) -> float:
+        """Return value of `node` from root player's perspective."""
         raise NotImplementedError
 
     def _backpropagate(self, node: MCTSNode, value_for_root: float) -> None:
+        """Push a single simulation result up to the root."""
         current = node
         while current is not None:
             current.visits += 1
@@ -347,6 +430,12 @@ class BaseMCTS(MCTSAgent):
             current = current.parent
 
     def choose_move(self, board: Board, player_to_move: Player) -> Tuple[Move, Dict[str, float]]:
+        """
+        Run the full MCTS loop and choose move with highest visit count.
+
+        The method returns both chosen move and lightweight diagnostics used by
+        experiment reporting (value estimate, visits, timing).
+        """
         root = MCTSNode(board=board, player_to_move=player_to_move)
 
         if root.is_terminal():
@@ -354,6 +443,7 @@ class BaseMCTS(MCTSAgent):
 
         start = time.perf_counter()
         for _ in range(self.iterations):
+            # Canonical four MCTS phases.
             selected = self._select(root)
             expanded = self._expand(selected)
             value = self._evaluate_leaf(expanded, root_player=player_to_move)
@@ -387,7 +477,10 @@ class BaseMCTS(MCTSAgent):
 
 
 class RandomRolloutMCTS(BaseMCTS):
+    """MCTS variant that evaluates frontier nodes via random playout to game end."""
+
     def _evaluate_leaf(self, node: MCTSNode, root_player: Player) -> float:
+        """Estimate value by uniformly random simulation until terminal state."""
         winner = node.board.winner()
         if winner == root_player:
             return 1.0
@@ -410,6 +503,13 @@ class RandomRolloutMCTS(BaseMCTS):
 
 
 class LLMGuidedMCTS(BaseMCTS):
+    """
+    MCTS variant that replaces random rollout with evaluator-based leaf scoring.
+
+    This dramatically reduces simulation depth: each leaf value comes from an
+    estimator (Gemini/Ollama/heuristic) and is cached by board+root player.
+    """
+
     def __init__(
         self,
         evaluator: LLMEvaluator,
@@ -422,6 +522,7 @@ class LLMGuidedMCTS(BaseMCTS):
         self.eval_cache: Dict[Tuple[str, Player], float] = {}
 
     def _evaluate_leaf(self, node: MCTSNode, root_player: Player) -> float:
+        """Evaluate frontier state from root perspective, using cache for reuse."""
         winner = node.board.winner()
         if winner == root_player:
             return 1.0
@@ -437,6 +538,8 @@ class LLMGuidedMCTS(BaseMCTS):
         player_to_move = node.player_to_move
         p_current = self.evaluator.evaluate(node.board, player_to_move)
 
+        # Evaluator always returns perspective of side-to-move at leaf.
+        # Convert to root-player perspective before backpropagation.
         if player_to_move == root_player:
             root_value = p_current
         else:
@@ -447,6 +550,14 @@ class LLMGuidedMCTS(BaseMCTS):
 
 
 def minimax_value(board: Board, player_to_move: Player, cache: Dict[Tuple[str, Player], float]) -> float:
+    """
+    Perfect-play value function for Tic-Tac-Toe.
+
+    Returns win probability for `player_to_move` under optimal play with values:
+    - 1.0 forced win
+    - 0.5 forced draw
+    - 0.0 forced loss
+    """
     key = (board.to_key(), player_to_move)
     if key in cache:
         return cache[key]
@@ -463,6 +574,7 @@ def minimax_value(board: Board, player_to_move: Player, cache: Dict[Tuple[str, P
         cache[key] = 0.5
         return 0.5
 
+    # Iterate legal moves and choose one maximizing current player's value.
     best = 0.0
     for move in board.legal_moves():
         next_board = board.apply_move(move, player_to_move)
@@ -478,6 +590,7 @@ def minimax_value(board: Board, player_to_move: Player, cache: Dict[Tuple[str, P
 
 
 def minimax_best_move(board: Board, player_to_move: Player) -> Move:
+    """Return one optimal move according to the exact minimax value function."""
     cache: Dict[Tuple[str, Player], float] = {}
     candidates: List[Tuple[float, Move]] = []
     for move in board.legal_moves():
@@ -491,6 +604,7 @@ def minimax_best_move(board: Board, player_to_move: Player) -> Move:
 
 
 def determine_player_to_move(board: Board) -> Player:
+    """Infer side to move from piece counts, assuming valid game history."""
     x_count = sum(1 for cell in board.cells if cell == "X")
     o_count = sum(1 for cell in board.cells if cell == "O")
     return "X" if x_count == o_count else "O"
@@ -498,6 +612,8 @@ def determine_player_to_move(board: Board) -> Player:
 
 @dataclass
 class GameResult:
+    """Outcome container for one game plus per-move timing/value metrics."""
+
     winner: Optional[Player]
     move_metrics: Dict[Player, List[Dict[str, float]]]
 
@@ -507,6 +623,7 @@ def play_game(
     o_agent: MCTSAgent,
     start_board: Optional[Board] = None,
 ) -> GameResult:
+    """Play one full game between two agents and record each move's stats."""
     board = start_board if start_board is not None else Board.empty()
     player = determine_player_to_move(board)
     move_metrics: Dict[Player, List[Dict[str, float]]] = {"X": [], "O": []}
@@ -523,12 +640,14 @@ def play_game(
         else:
             move, stats = o_agent.choose_move(board, player)
 
+        # Store metrics under the side that just made the move.
         move_metrics[player].append(stats)
         board = board.apply_move(move, player)
         player = other_player(player)
 
 
 def play_against_minimax(agent: MCTSAgent, agent_player: Player) -> GameResult:
+    """Play one game where one side is the tested agent and the other is perfect minimax."""
     board = Board.empty()
     player = "X"
     move_metrics: Dict[Player, List[Dict[str, float]]] = {"X": [], "O": []}
@@ -550,6 +669,7 @@ def play_against_minimax(agent: MCTSAgent, agent_player: Player) -> GameResult:
 
 
 def average_metric(stats_list: List[Dict[str, float]], key: str) -> float:
+    """Compute arithmetic mean for a key over per-move statistics dictionaries."""
     if not stats_list:
         return 0.0
     return sum(item.get(key, 0.0) for item in stats_list) / float(len(stats_list))
@@ -562,6 +682,7 @@ def build_agent(
     seed: int,
     evaluator: Optional[LLMEvaluator],
 ) -> MCTSAgent:
+    """Factory helper to construct baseline or llm-guided agents."""
     if kind == "baseline":
         return RandomRolloutMCTS(iterations=iterations, exploration_c=exploration_c, seed=seed)
     if kind == "llm":
@@ -577,6 +698,12 @@ def build_agent(
 
 
 def evaluate_opening_move_quality(agent: MCTSAgent) -> Dict[str, float]:
+    """
+    Measure how good an agent's first move is from the empty board.
+
+    We compare the chosen opening to exact minimax value and return move metadata
+    that is useful for assignment tables/plots.
+    """
     board = Board.empty()
     move, stats = agent.choose_move(board, "X")
     next_board = board.apply_move(move, "X")
@@ -593,6 +720,13 @@ def evaluate_opening_move_quality(agent: MCTSAgent) -> Dict[str, float]:
 
 
 def run_comparison_experiments(args: argparse.Namespace) -> Dict[str, object]:
+    """
+    Core assignment experiment harness.
+
+    For each iteration setting, this runs multiple head-to-head games with side
+    swapping (LLM as X then as O) to reduce first-move bias, then aggregates W/D/L
+    and timing/value metrics for both agents.
+    """
     evaluator = build_evaluator(args)
     iteration_values = [int(part.strip()) for part in args.iteration_grid.split(",") if part.strip()]
     if not iteration_values:
@@ -617,6 +751,7 @@ def run_comparison_experiments(args: argparse.Namespace) -> Dict[str, object]:
         baseline_move_stats: List[Dict[str, float]] = []
 
         for game_index in range(args.games):
+            # Alternate sides so each approach gets equal exposure as first player.
             if game_index % 2 == 0:
                 x_agent = build_agent(
                     "llm",
@@ -672,6 +807,7 @@ def run_comparison_experiments(args: argparse.Namespace) -> Dict[str, object]:
                     llm_wdl["draw"] += 1
                     baseline_wdl["draw"] += 1
 
+        # Additional scalar signal: objective quality of chosen opening move.
         llm_opening = evaluate_opening_move_quality(
             build_agent("llm", iterations, args.exploration_c, args.seed + 9001, evaluator)
         )
@@ -700,6 +836,7 @@ def run_comparison_experiments(args: argparse.Namespace) -> Dict[str, object]:
         }
 
         if args.include_minimax:
+            # Optional strict benchmark: each agent plays both sides vs perfect play.
             llm_vs_minimax = defaultdict(int)
             baseline_vs_minimax = defaultdict(int)
 
@@ -766,6 +903,7 @@ def run_comparison_experiments(args: argparse.Namespace) -> Dict[str, object]:
 
 
 def print_comparison_summary(summary: Dict[str, object]) -> None:
+    """Pretty-print compact experiment results for terminal/assignment logs."""
     print("Comparison: Baseline random-rollout MCTS vs LLM-guided MCTS")
     print(json.dumps(summary["config"], indent=2))
     print()
@@ -798,6 +936,7 @@ def print_comparison_summary(summary: Dict[str, object]) -> None:
 
 
 def parse_move(move_text: str) -> Move:
+    """Parse move text in 'row,col' format into integer tuple."""
     parts = move_text.split(",")
     if len(parts) != 2:
         raise ValueError("Move must be in 'row,col' format.")
@@ -805,6 +944,14 @@ def parse_move(move_text: str) -> Move:
 
 
 def build_evaluator(args: argparse.Namespace) -> LLMEvaluator:
+    """
+    Construct evaluator backend from CLI arguments.
+
+    Supported providers:
+    - heuristic: no network calls
+    - gemini: Google API endpoint
+    - ollama: local/remote Ollama endpoint
+    """
     if args.provider == "heuristic":
         return HeuristicFallbackEvaluator()
 
@@ -828,6 +975,7 @@ def build_evaluator(args: argparse.Namespace) -> LLMEvaluator:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    """CLI entry point for single-board solve mode and full experiment mode."""
     parser = argparse.ArgumentParser(description="LLM-guided MCTS solver for Tic-Tac-Toe")
     parser.add_argument(
         "--mode",
@@ -882,6 +1030,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     if args.mode == "single":
+        # Solve one board position and print chosen move + diagnostics.
         board = Board.from_text(args.board)
         evaluator = build_evaluator(args)
         solver = LLMGuidedMCTS(
@@ -902,6 +1051,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(json.dumps(stats, indent=2))
         return 0
 
+    # Default mode: run full side-by-side experiment harness.
     summary = run_comparison_experiments(args)
     print_comparison_summary(summary)
     if args.output_json:
