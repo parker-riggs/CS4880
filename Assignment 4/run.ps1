@@ -22,6 +22,7 @@ $programPath = Join-Path $scriptDir "llm_guided_mcts.py"
 
 $pythonArgs = @(
     $programPath,
+    "--mode", "single",
     "--board", $Board,
     "--player", $Player,
     "--provider", $Provider,
