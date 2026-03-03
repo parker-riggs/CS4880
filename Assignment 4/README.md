@@ -1,51 +1,57 @@
-# Assignment 4 — Part 1: LLM-Guided MCTS Solver
+# Assignment 4 — LLM-Guided MCTS for Tic-Tac-Toe
 
-**Part 1 implementation** of an LLM-guided Monte Carlo Tree Search solver for Tic-Tac-Toe.
+This repository contains the Assignment 4 implementation of:
 
-## What was created
+- **Baseline MCTS** using random rollouts
+- **LLM-guided MCTS** using value estimates from Gemini/Ollama (with heuristic/offline fallback)
+
+The main experiment entry point is `llm_guided_mcts.py`, which defaults to **compare mode**.
+
+## Repository Contents
 
 - `llm_guided_mcts.py`
-  - Tic-Tac-Toe board/game engine (`Board`)
-  - MCTS node structure (`MCTSNode`)
-  - LLM-guided MCTS search (`LLMGuidedMCTS`)
-  - LLM evaluator interface (`LLMEvaluator`)
-  - Provider implementations:
-    - `GeminiEvaluator` (Google Gemini `generateContent` API)
-    - `OllamaEvaluator` (local Ollama endpoint)
-    - `HeuristicFallbackEvaluator` (offline fallback)
-  - Evaluation cache for repeated board states during search
-  - CLI for selecting a move from a given board state
+  - Board engine (`Board`)
+  - MCTS core (`MCTSNode`, `BaseMCTS`, `RandomRolloutMCTS`, `LLMGuidedMCTS`)
+  - Evaluators (`HeuristicFallbackEvaluator`, `GeminiEvaluator`, `OllamaEvaluator`)
+  - Exact minimax utilities for benchmarking
+  - Experiment harness for side-by-side comparisons
+- `run.ps1`
+  - Convenience wrapper for **single-move mode**
+- `test_all.ps1`
+  - Smoke tests over several boards (heuristic by default; optional Gemini/Ollama)
 
-## Scope
+## Requirements
 
-This implementation now includes both:
+- Python 3.9+
+- For Gemini mode: `GEMINI_API_KEY` environment variable
+- For Ollama mode: running Ollama server (default endpoint `http://localhost:11434/api/generate`)
 
-- **Baseline MCTS** with standard random rollouts in Simulation.
-- **LLM-guided MCTS** where Simulation/Evaluation uses an LLM (or heuristic fallback) value estimate.
+## Quick Start
 
-- It supports controlled comparison over fixed iteration counts (for example `10,50,100,500`), tracks win/draw/loss, per-move chosen value estimate, and time-per-iteration.
-- Optional minimax benchmarking is included.
-
-The script defaults to **comparison mode** for assignment experiments.
-
-## How to run
-
-From `Assignment 4/`:
-
-### Quick Run
-Must run:
-```powershell
-$env:GEMINI_API_KEY="YOUR_KEY"
-```
-To set your API key!!
+From the `Assignment 4/` folder:
 
 ```powershell
 ./run.ps1
+```
+
+This runs **single-move mode** with:
+
+- provider: `heuristic`
+- board: empty (`.........`)
+- player: `X`
+
+### Provider-specific quick runs
+
+```powershell
+# Gemini (API key required only for Gemini provider)
+$env:GEMINI_API_KEY="YOUR_KEY"
 ./run.ps1 -Provider gemini
+
+# Ollama
 ./run.ps1 -Provider ollama -Model llama3.1
 ```
 
-For full smoke tests:
+### Smoke tests
 
 ```powershell
 ./test_all.ps1
@@ -53,71 +59,57 @@ For full smoke tests:
 ./test_all.ps1 -IncludeOllama
 ```
 
-### 1) Compare mode (default, assignment experiments)
+## Running Experiments (Compare Mode)
+
+`llm_guided_mcts.py` defaults to compare mode and reports baseline vs LLM-guided results.
 
 ```powershell
 python llm_guided_mcts.py --provider heuristic --iteration-grid 10,50,100,500 --games 20
 ```
 
-Optional:
+Optional minimax benchmark and JSON export:
 
 ```powershell
 python llm_guided_mcts.py --provider heuristic --iteration-grid 10,50,100,500 --games 20 --include-minimax --output-json results.json
 ```
 
-### 2) Single move mode (one board position, one chosen move)
-
-```powershell
-python llm_guided_mcts.py --mode single --player X --provider heuristic --iterations 200
-```
-
-### 3) Gemini Flash mode
+### Compare mode with Gemini / Ollama
 
 ```powershell
 $env:GEMINI_API_KEY="YOUR_KEY"
-python llm_guided_mcts.py --mode single --player X --provider gemini --model gemini-2.0-flash --max-tokens 8192 --iterations 200
+python llm_guided_mcts.py --provider gemini --model gemini-2.0-flash --iteration-grid 10,50,100,500 --games 20
+
+python llm_guided_mcts.py --provider ollama --model llama3.1 --base-url http://localhost:11434/api/generate --iteration-grid 10,50,100,500 --games 20
 ```
 
-Optional Gemini args:
+## Single-Move Mode
 
-- `--base-url https://generativelanguage.googleapis.com`
-- `--temperature 0`
-- `--max-tokens 8192`
-- `--timeout 20`
-
-You can also use wrappers with custom args, for example:
+Use this when you want one selected move for a specific position:
 
 ```powershell
-./run.ps1 -Provider gemini -Player O -Iterations 300 -Board "XO...O..."
+python llm_guided_mcts.py --mode single --board "XO...O..." --player X --provider heuristic --iterations 200
 ```
 
-### 4) Ollama mode
+## CLI Notes
 
-```powershell
-python llm_guided_mcts.py --mode single --player X --provider ollama --model llama3.1 --base-url http://localhost:11434/api/generate --iterations 200
-```
+- `--board` uses 9 characters in row-major order.
+- Allowed board symbols: `X`, `O`, and empty as `.`, `_`, `-`, or space.
+- `--provider` options: `heuristic`, `gemini`, `ollama`.
+- `--mode` options: `compare` (default), `single`.
 
-## Input format
+## What the Script Reports
 
-- `--board` is a 9-character row-major board string.
-- Use `X`, `O`, and one of `.`, `_`, `-`, or space for empty cells.
+### Compare mode output
 
-Example board:
+- Win / Draw / Loss for both agents at each iteration count
+- Average chosen move value
+- Average time per iteration
+- Opening move quality compared against minimax
+- Optional vs-minimax summary when `--include-minimax` is enabled
 
-- `--board "XO...O..."`
+### Single mode output
 
-## Output
-
-In compare mode, the script prints:
-
-- Per-iteration comparison rows for baseline vs LLM-guided MCTS
-- Win/draw/loss summary
-- Average chosen move value and average time-per-iteration
-- Opening move quality versus minimax value
-
-In single mode, the script prints:
-
-- Input board (pretty 3×3 text)
+- Pretty-printed input board
 - Player to move
 - Chosen move (`row,col`)
-- Search stats (iterations, chosen move value, chosen move visits, elapsed time)
+- Search stats (`iterations`, `chosen_move_value`, `chosen_move_visits`, timing)
