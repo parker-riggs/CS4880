@@ -24,5 +24,5 @@ An incomplete example is posted in [Maze2](Maze2).
 
 * Parker Riggs
   * Q-Learning, REINFORCE, PPO, AdaptiveRushBot LLM-guided (5×5 GridMaze env)
-  * [Code](https://github.com/<your-username>/CS4880/tree/main/Assignment%208)
-  * [WandB Report](<paste WandB report link here after running rl_zoo.py>)
+  * [Code](https://github.com/parker-riggs/CS4880/tree/main/Assignment%208)
+  * [WandB Report](https://wandb.ai/pr881922-ohio-university/rl-algorithm-zoo?nw=nwuserpr881922)
