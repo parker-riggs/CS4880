@@ -153,8 +153,10 @@ pip install -r "Assignment 8/requirements.txt"
 
 **macOS / Linux / WSL:**
 ```bash
-pip3 install -r "Assignment 8/requirements.txt"
+pip3 install -r "Assignment 8/requirements.txt" --index-url https://download.pytorch.org/whl/cpu
 ```
+
+> The `--index-url` flag forces the CPU-only PyTorch wheel. Without it, pip installs a CUDA-enabled build that fails on systems without NVIDIA GPU drivers (e.g. WSL).
 
 This installs `numpy`, `torch`, and `wandb`.
 
