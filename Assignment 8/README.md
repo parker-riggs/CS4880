@@ -129,18 +129,31 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-**macOS / Linux:**
+**macOS / Linux / WSL:**
+
+> **WSL/Ubuntu first-time setup:** `python3-venv` and `pip` are not pre-installed. Run this once before creating the venv:
+> ```bash
+> sudo apt update && sudo apt install python3-pip python3-venv -y
+> ```
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-> Your prompt should now show `(.venv)` — all packages install into this isolated environment.
+> Your prompt should now show `(.venv)` — all packages install into this isolated environment.  
+> Always use `python3` and `pip3` in WSL/Linux terminals — `python` is not available by default.
 
 ### 4. Install dependencies
 
-```bash
+**Windows (PowerShell):**
+```powershell
 pip install -r "Assignment 8/requirements.txt"
+```
+
+**macOS / Linux / WSL:**
+```bash
+pip3 install -r "Assignment 8/requirements.txt"
 ```
 
 This installs `numpy`, `torch`, and `wandb`.
@@ -162,14 +175,16 @@ Skip this step entirely if you plan to use `--offline` mode.
 cd "Assignment 8"
 
 # Full run – logs to WandB project "rl-algorithm-zoo"
-python rl_zoo.py --project rl-algorithm-zoo
+python3 rl_zoo.py --project rl-algorithm-zoo
 
 # Offline mode (no internet required, sync later with `wandb sync`)
-python rl_zoo.py --offline
+python3 rl_zoo.py --offline
 
 # Adjust episode count and seed
-python rl_zoo.py --episodes 5000 --seed 0 --project rl-algorithm-zoo
+python3 rl_zoo.py --episodes 5000 --seed 0 --project rl-algorithm-zoo
 ```
+
+> **Directory name has a space** — always wrap it in quotes: `cd "Assignment 8"`
 
 ### CLI flags
 
@@ -185,9 +200,9 @@ python rl_zoo.py --episodes 5000 --seed 0 --project rl-algorithm-zoo
 Each agent module has a `__main__` block for quick standalone testing:
 
 ```bash
-python qlearning_agent.py   # trains Q-Learning, prints last-100 avg
-python reinforce_agent.py   # trains REINFORCE
-python ppo_agent.py         # trains PPO
+python3 qlearning_agent.py   # trains Q-Learning, prints last-100 avg
+python3 reinforce_agent.py   # trains REINFORCE
+python3 ppo_agent.py         # trains PPO
 ```
 
 ---
