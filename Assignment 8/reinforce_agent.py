@@ -1,23 +1,5 @@
 """
 reinforce_agent.py – REINFORCE: a pure Policy-Based RL algorithm (NumPy implementation).
-
-REINFORCE optimises a stochastic policy π_θ(a|s) via the policy gradient:
-
-    ∇_θ J(θ) ≈ Σ_t  G_t · ∇_θ log π_θ(a_t | s_t)
-
-where G_t is the Monte-Carlo discounted return from step t.
-
-Policy: linear softmax  π(a|s) = softmax(W · x_s)
-  where x_s is the one-hot encoding of state s and W ∈ R^{n_actions × n_states}.
-
-Gradient of log π(a|s) w.r.t. W  (exact, no autograd needed):
-    ∂ log π(a|s) / ∂W  =  (e_a − π(·|s)) ⊗ x_s
-
-Returns are normalised within each episode to reduce gradient variance.
-
-References:
-  Williams, 1992 — Simple Statistical Gradient-Following Algorithms for
-  Connectionist Reinforcement Learning
 """
 
 from __future__ import annotations
