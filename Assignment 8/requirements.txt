@@ -1,5 +1,2 @@
 numpy>=1.24
-# CPU-only PyTorch - avoids CUDA wheel issues on WSL/Linux without GPU drivers.
-# Install with: pip3 install -r requirements.txt --index-url https://download.pytorch.org/whl/cpu
-torch>=2.0
 wandb>=0.17,<0.18

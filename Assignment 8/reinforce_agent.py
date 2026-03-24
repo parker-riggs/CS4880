@@ -1,50 +1,41 @@
 """
-reinforce_agent.py – REINFORCE: a pure Policy-Based RL algorithm.
+reinforce_agent.py – REINFORCE: a pure Policy-Based RL algorithm (NumPy implementation).
+
+REINFORCE optimises a stochastic policy π_θ(a|s) via the policy gradient:
+
+    ∇_θ J(θ) ≈ Σ_t  G_t · ∇_θ log π_θ(a_t | s_t)
+
+where G_t is the Monte-Carlo discounted return from step t.
+
+Policy: linear softmax  π(a|s) = softmax(W · x_s)
+  where x_s is the one-hot encoding of state s and W ∈ R^{n_actions × n_states}.
+
+Gradient of log π(a|s) w.r.t. W  (exact, no autograd needed):
+    ∂ log π(a|s) / ∂W  =  (e_a − π(·|s)) ⊗ x_s
+
+Returns are normalised within each episode to reduce gradient variance.
+
+References:
+  Williams, 1992 — Simple Statistical Gradient-Following Algorithms for
+  Connectionist Reinforcement Learning
 """
 
 from __future__ import annotations
 
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-
 from maze_env import MazeEnv
-
-
-class PolicyNetwork(nn.Module):
-    """
-    Two-layer MLP policy head.
-
-    Input  : one-hot state vector of length n_states
-    Output : softmax probability distribution over n_actions
-    """
-
-    def __init__(self, n_states: int, n_actions: int, hidden: int = 64):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(n_states, hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, n_actions),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.softmax(self.net(x), dim=-1)
 
 
 class REINFORCEAgent:
     """
-    Pure policy-gradient agent (no critic / no value function).
+    Pure Monte-Carlo policy-gradient agent — no critic, no torch.
 
     Parameters
     ----------
-    n_states  : size of the one-hot state encoding
+    n_states  : number of discrete states
     n_actions : number of discrete actions
-    lr        : Adam learning rate
+    lr        : learning rate for the policy weight update
     gamma     : reward discount factor
-    hidden    : hidden units per layer
     """
 
     def __init__(
@@ -53,72 +44,75 @@ class REINFORCEAgent:
         n_actions: int,
         lr: float = 1e-3,
         gamma: float = 0.99,
-        hidden: int = 64,
+        **_kwargs,          # absorbs unused kwargs (e.g. hidden=64) from rl_zoo
     ):
         self.n_states = n_states
         self.n_actions = n_actions
+        self.lr = lr
         self.gamma = gamma
 
-        self.policy = PolicyNetwork(n_states, n_actions, hidden)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+        # Linear policy weights: W[a, s] → logit for action a in state s
+        self.W = np.zeros((n_actions, n_states))
 
-        # Episode trajectory buffers (cleared after each update)
-        self._log_probs: list[torch.Tensor] = []
+        # Per-episode trajectory buffers
+        self._trajectory: list[tuple[int, int, np.ndarray]] = []  # (action, state, probs)
         self._rewards: list[float] = []
 
     # ------------------------------------------------------------------
 
-    def _one_hot(self, state: int) -> torch.Tensor:
-        v = torch.zeros(self.n_states, dtype=torch.float32)
-        v[state] = 1.0
-        return v
+    def _softmax(self, x: np.ndarray) -> np.ndarray:
+        x = x - np.max(x)          # numerical stability
+        e = np.exp(x)
+        return e / e.sum()
+
+    def _probs(self, state: int) -> np.ndarray:
+        oh = np.zeros(self.n_states)
+        oh[state] = 1.0
+        return self._softmax(self.W @ oh)
 
     def select_action(self, state: int, training: bool = True) -> int:
-        """Sample an action from the policy distribution."""
-        state_t = self._one_hot(state).unsqueeze(0)
-        probs = self.policy(state_t)
+        """Sample an action; record trajectory step when training."""
+        probs = self._probs(state)
         if training:
-            dist = torch.distributions.Categorical(probs)
-            action = dist.sample()
-            self._log_probs.append(dist.log_prob(action))
-            return int(action.item())
-        # Greedy at evaluation time
-        return int(probs.argmax(dim=-1).item())
+            action = int(np.random.choice(self.n_actions, p=probs))
+            self._trajectory.append((action, state, probs))
+        else:
+            action = int(np.argmax(probs))
+        return action
 
     def store_reward(self, reward: float) -> None:
         self._rewards.append(reward)
 
     def update(self) -> float:
         """
-        Compute Monte-Carlo returns and perform one gradient step.
-        Returns the scalar loss for logging.
+        Compute Monte-Carlo returns G_t and apply policy-gradient update.
+        Returns the mean absolute gradient magnitude for logging.
         """
-        # Compute discounted returns G_t for each timestep t
+        # Compute discounted returns
         G = 0.0
         returns: list[float] = []
         for r in reversed(self._rewards):
             G = r + self.gamma * G
             returns.insert(0, G)
 
-        returns_t = torch.tensor(returns, dtype=torch.float32)
+        returns_arr = np.array(returns, dtype=np.float64)
+        if len(returns_arr) > 1:
+            returns_arr = (returns_arr - returns_arr.mean()) / (returns_arr.std() + 1e-8)
 
-        # Normalise returns (reduces variance; not a learned baseline)
-        if returns_t.numel() > 1:
-            returns_t = (returns_t - returns_t.mean()) / (returns_t.std() + 1e-8)
+        total_grad = 0.0
+        for (action, state, probs), G_t in zip(self._trajectory, returns_arr):
+            oh = np.zeros(self.n_states)
+            oh[state] = 1.0
+            e_a = np.zeros(self.n_actions)
+            e_a[action] = 1.0
+            # ∂ log π(a|s) / ∂W  =  (e_a − probs) ⊗ x_s
+            grad = np.outer(e_a - probs, oh)
+            self.W += self.lr * G_t * grad
+            total_grad += float(np.abs(grad).mean())
 
-        # Policy gradient loss: −E[log π(a|s) · G_t]
-        loss = torch.stack(
-            [-lp * G for lp, G in zip(self._log_probs, returns_t)]
-        ).sum()
-
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
-        # Reset buffers for next episode
-        self._log_probs = []
+        self._trajectory = []
         self._rewards = []
-        return float(loss.item())
+        return total_grad / max(len(returns_arr), 1)
 
     @property
     def name(self) -> str:
@@ -134,28 +128,12 @@ def train(
     n_episodes: int = 3000,
     lr: float = 1e-3,
     gamma: float = 0.99,
-    hidden: int = 64,
     seed: int = 42,
+    **_kwargs,
 ) -> tuple[REINFORCEAgent, list[float], list[int]]:
-    """
-    Train a REINFORCE agent on *env* for *n_episodes* episodes.
-
-    Returns
-    -------
-    agent          : trained REINFORCEAgent
-    episode_rewards: list of total reward per episode
-    episode_steps  : list of steps taken per episode
-    """
-    torch.manual_seed(seed)
     np.random.seed(seed)
 
-    agent = REINFORCEAgent(
-        n_states=env.n_states,
-        n_actions=env.n_actions,
-        lr=lr,
-        gamma=gamma,
-        hidden=hidden,
-    )
+    agent = REINFORCEAgent(n_states=env.n_states, n_actions=env.n_actions, lr=lr, gamma=gamma)
 
     episode_rewards: list[float] = []
     episode_steps: list[int] = []
@@ -182,9 +160,6 @@ def train(
     return agent, episode_rewards, episode_steps
 
 
-# ---------------------------------------------------------------------------
-# Quick self-test
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     env = MazeEnv()
     agent, rewards, steps = train(env, n_episodes=3000)

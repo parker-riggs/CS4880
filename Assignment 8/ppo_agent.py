@@ -1,61 +1,48 @@
 """
-ppo_agent.py – Proximal Policy Optimization (PPO): a Hybrid RL algorithm.
+ppo_agent.py – Proximal Policy Optimization (PPO): Hybrid RL (pure NumPy).
+
+PPO is an Actor-Critic algorithm combining a policy (actor) and a value
+function (critic).  It uses Generalised Advantage Estimation (GAE) and
+a clipped surrogate objective to prevent large destabilising updates.
+
+Implementation: linear softmax actor + linear critic, no external ML library.
+
+  Actor : π(a|s) = softmax(W_actor · x_s)       W_actor ∈ R^{n_actions × n_states}
+  Critic: V(s)   = w_critic[s]                    w_critic ∈ R^{n_states}
+
+Exact analytic gradients are used for both networks.
+
+GAE advantage:
+  A_t = Σ_{l≥0} (γλ)^l · δ_{t+l},   δ_t = r_t + γV(s_{t+1}) − V(s_t)
+
+Clipped surrogate (per-step):
+  L = min(r_t · A_t,  clip(r_t, 1−ε, 1+ε) · A_t)
+  where r_t = π_new(a_t|s_t) / π_old(a_t|s_t)
+
+References:
+  Schulman et al., 2017 — Proximal Policy Optimization Algorithms
 """
 
 from __future__ import annotations
 
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-
 from maze_env import MazeEnv
-
-
-class ActorCritic(nn.Module):
-    """
-    Shared-backbone network with separate actor and critic heads.
-
-    Input  : one-hot state vector of length n_states
-    Outputs:
-      probs : softmax action probability distribution  (n_actions,)
-      value : scalar state-value estimate              (1,)
-    """
-
-    def __init__(self, n_states: int, n_actions: int, hidden: int = 64):
-        super().__init__()
-        self.backbone = nn.Sequential(
-            nn.Linear(n_states, hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, hidden),
-            nn.ReLU(),
-        )
-        self.policy_head = nn.Linear(hidden, n_actions)
-        self.value_head = nn.Linear(hidden, 1)
-
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        features = self.backbone(x)
-        probs = torch.softmax(self.policy_head(features), dim=-1)
-        value = self.value_head(features)
-        return probs, value
 
 
 class PPOAgent:
     """
-    Per-episode PPO agent with GAE advantage estimation.
+    Per-episode PPO agent with GAE and clipped surrogate — pure NumPy.
 
     Parameters
     ----------
-    n_states   : size of the one-hot state encoding
+    n_states   : number of discrete states
     n_actions  : number of discrete actions
-    lr         : Adam learning rate
+    lr         : learning rate for both actor and critic
     gamma      : reward discount factor
     gae_lambda : GAE smoothing parameter λ
-    clip_eps   : PPO clipping radius ε
-    n_epochs   : gradient steps per episode update
-    hidden     : hidden units per backbone layer
-    vf_coef    : coefficient on the value-function loss
-    ent_coef   : entropy bonus coefficient (encourages exploration)
+    clip_eps   : PPO clip radius ε
+    n_epochs   : gradient passes over each episode’s trajectory
+    vf_coef    : relative weight of value loss (informational only)
     """
 
     def __init__(
@@ -67,56 +54,53 @@ class PPOAgent:
         gae_lambda: float = 0.95,
         clip_eps: float = 0.2,
         n_epochs: int = 4,
-        hidden: int = 64,
         vf_coef: float = 0.5,
-        ent_coef: float = 0.01,
+        **_kwargs,  # absorbs unused kwargs (e.g. hidden=64)
     ):
         self.n_states = n_states
         self.n_actions = n_actions
+        self.lr = lr
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.clip_eps = clip_eps
         self.n_epochs = n_epochs
         self.vf_coef = vf_coef
-        self.ent_coef = ent_coef
 
-        self.network = ActorCritic(n_states, n_actions, hidden)
-        self.optimizer = optim.Adam(self.network.parameters(), lr=lr)
+        # Linear actor weights and linear critic weights
+        self.W = np.zeros((n_actions, n_states))   # actor
+        self.v = np.zeros(n_states)                # critic
 
         # Per-episode trajectory buffers
         self._states: list[int] = []
         self._actions: list[int] = []
         self._rewards: list[float] = []
-        self._log_probs: list[float] = []
+        self._probs_old: list[float] = []   # π_old(a|s) for each step
         self._values: list[float] = []
         self._dones: list[bool] = []
 
     # ------------------------------------------------------------------
 
-    def _one_hot(self, state: int) -> torch.Tensor:
-        v = torch.zeros(self.n_states, dtype=torch.float32)
-        v[state] = 1.0
-        return v
+    def _softmax(self, x: np.ndarray) -> np.ndarray:
+        x = x - np.max(x)
+        e = np.exp(x)
+        return e / e.sum()
+
+    def _actor_probs(self, state: int) -> np.ndarray:
+        oh = np.zeros(self.n_states)
+        oh[state] = 1.0
+        return self._softmax(self.W @ oh)
 
     def select_action(self, state: int, training: bool = True) -> int:
-        """
-        Sample an action and record the trajectory step.
-        Uses no_grad since we re-compute log-probs during the update.
-        """
-        with torch.no_grad():
-            state_t = self._one_hot(state).unsqueeze(0)
-            probs, value = self.network(state_t)
-
+        probs = self._actor_probs(state)
         if training:
-            dist = torch.distributions.Categorical(probs)
-            action = dist.sample()
+            action = int(np.random.choice(self.n_actions, p=probs))
             self._states.append(state)
-            self._actions.append(int(action.item()))
-            self._log_probs.append(float(dist.log_prob(action).item()))
-            self._values.append(float(value.item()))
-            return int(action.item())
-
-        return int(probs.argmax(dim=-1).item())
+            self._actions.append(action)
+            self._probs_old.append(float(probs[action]))
+            self._values.append(float(self.v[state]))
+        else:
+            action = int(np.argmax(probs))
+        return action
 
     def store_transition(self, reward: float, done: bool) -> None:
         self._rewards.append(reward)
@@ -124,13 +108,13 @@ class PPOAgent:
 
     def update(self) -> float:
         """
-        Compute GAE advantages and run n_epochs of PPO gradient updates.
-        Returns the mean total loss for logging.
+        Compute GAE advantages then run n_epochs of clipped PPO updates.
+        Returns mean |value error| for logging.
         """
         T = len(self._rewards)
 
-        # ---- Compute GAE advantages backwards through the episode ----
-        advantages = [0.0] * T
+        # ---- GAE backwards pass ----
+        advantages = np.zeros(T)
         last_gae = 0.0
         for t in reversed(range(T)):
             next_val = 0.0 if (t == T - 1 or self._dones[t]) else self._values[t + 1]
@@ -138,47 +122,45 @@ class PPOAgent:
             last_gae = delta + self.gamma * self.gae_lambda * (not self._dones[t]) * last_gae
             advantages[t] = last_gae
 
-        advantages_t = torch.tensor(advantages, dtype=torch.float32)
-        returns_t = advantages_t + torch.tensor(self._values, dtype=torch.float32)
+        returns = advantages + np.array(self._values)
+        if T > 1:
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        # Normalise advantages for stable updates
-        if advantages_t.numel() > 1:
-            advantages_t = (advantages_t - advantages_t.mean()) / (advantages_t.std() + 1e-8)
+        probs_old = np.array(self._probs_old)
+        total_err = 0.0
 
-        old_log_probs_t = torch.tensor(self._log_probs, dtype=torch.float32)
-        states_oh = torch.stack([self._one_hot(s) for s in self._states])
-        actions_t = torch.tensor(self._actions, dtype=torch.long)
-
-        # ---- Multiple gradient epochs on the same collected data ----
-        total_loss = 0.0
         for _ in range(self.n_epochs):
-            probs, values = self.network(states_oh)
-            dist = torch.distributions.Categorical(probs)
-            new_log_probs = dist.log_prob(actions_t)
-            entropy = dist.entropy().mean()
+            for t in range(T):
+                s = self._states[t]
+                a = self._actions[t]
+                A = float(advantages[t])
 
-            ratio = torch.exp(new_log_probs - old_log_probs_t)
-            surr1 = ratio * advantages_t
-            surr2 = torch.clamp(ratio, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * advantages_t
-            policy_loss = -torch.min(surr1, surr2).mean()
-            value_loss = self.vf_coef * (values.squeeze() - returns_t).pow(2).mean()
-            loss = policy_loss + value_loss - self.ent_coef * entropy
+                probs = self._actor_probs(s)
+                ratio = probs[a] / (probs_old[t] + 1e-8)
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            nn.utils.clip_grad_norm_(self.network.parameters(), max_norm=0.5)
-            self.optimizer.step()
-            total_loss += float(loss.item())
+                # Only update actor when surrogate is not clipped
+                clipped = np.clip(ratio, 1 - self.clip_eps, 1 + self.clip_eps)
+                if (A >= 0 and ratio < 1 + self.clip_eps) or \
+                   (A < 0 and ratio > 1 - self.clip_eps):
+                    oh = np.zeros(self.n_states)
+                    oh[s] = 1.0
+                    e_a = np.zeros(self.n_actions)
+                    e_a[a] = 1.0
+                    # d(ratio · A)/d(W) = A · ratio · (e_a − probs) ⊗ x_s
+                    self.W += self.lr * A * ratio * np.outer(e_a - probs, oh)
 
-        # Clear trajectory buffers
+                # Critic MSE gradient: d(V-G)^2/d(v[s]) = 2*(V-G)
+                val_err = float(self.v[s]) - returns[t]
+                self.v[s] -= self.lr * self.vf_coef * 2.0 * val_err
+                total_err += abs(val_err)
+
         self._states = []
         self._actions = []
         self._rewards = []
-        self._log_probs = []
+        self._probs_old = []
         self._values = []
         self._dones = []
-
-        return total_loss / self.n_epochs
+        return total_err / max(T * self.n_epochs, 1)
 
     @property
     def name(self) -> str:
@@ -197,19 +179,9 @@ def train(
     gae_lambda: float = 0.95,
     clip_eps: float = 0.2,
     n_epochs: int = 4,
-    hidden: int = 64,
     seed: int = 42,
+    **_kwargs,
 ) -> tuple[PPOAgent, list[float], list[int]]:
-    """
-    Train a PPO agent on *env* for *n_episodes* episodes.
-
-    Returns
-    -------
-    agent          : trained PPOAgent
-    episode_rewards: list of total reward per episode
-    episode_steps  : list of steps taken per episode
-    """
-    torch.manual_seed(seed)
     np.random.seed(seed)
 
     agent = PPOAgent(
@@ -220,7 +192,6 @@ def train(
         gae_lambda=gae_lambda,
         clip_eps=clip_eps,
         n_epochs=n_epochs,
-        hidden=hidden,
     )
 
     episode_rewards: list[float] = []
@@ -248,9 +219,6 @@ def train(
     return agent, episode_rewards, episode_steps
 
 
-# ---------------------------------------------------------------------------
-# Quick self-test
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     env = MazeEnv()
     agent, rewards, steps = train(env, n_episodes=3000)
