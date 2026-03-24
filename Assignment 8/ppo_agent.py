@@ -1,26 +1,5 @@
 """
 ppo_agent.py – Proximal Policy Optimization (PPO): Hybrid RL (pure NumPy).
-
-PPO is an Actor-Critic algorithm combining a policy (actor) and a value
-function (critic).  It uses Generalised Advantage Estimation (GAE) and
-a clipped surrogate objective to prevent large destabilising updates.
-
-Implementation: linear softmax actor + linear critic, no external ML library.
-
-  Actor : π(a|s) = softmax(W_actor · x_s)       W_actor ∈ R^{n_actions × n_states}
-  Critic: V(s)   = w_critic[s]                    w_critic ∈ R^{n_states}
-
-Exact analytic gradients are used for both networks.
-
-GAE advantage:
-  A_t = Σ_{l≥0} (γλ)^l · δ_{t+l},   δ_t = r_t + γV(s_{t+1}) − V(s_t)
-
-Clipped surrogate (per-step):
-  L = min(r_t · A_t,  clip(r_t, 1−ε, 1+ε) · A_t)
-  where r_t = π_new(a_t|s_t) / π_old(a_t|s_t)
-
-References:
-  Schulman et al., 2017 — Proximal Policy Optimization Algorithms
 """
 
 from __future__ import annotations
