@@ -22,12 +22,7 @@ An incomplete example is posted in [Maze2](Maze2).
 
 ### Submission here:
 
-* Colin Murphy
-  * QLearning, A2C, PPO, Decision Transformer (Maze env)
-  * [Code](https://github.com/Colinster327/maze-rl)
-  * [WandB Report](https://api.wandb.ai/links/colinster327/vm0dq8m0)
-
-* Allison McKee
-  * QLearning, A2C, REINFORCE, DQN (Maze env)
-  * [Code](https://github.com/allynnae/RL-Algorithm-Zoo)
-  * [WandB Report](https://wandb.ai/am893120/rl-algorithm-zoo/reports/Reinforcement-Learning-Algorithm-Comparison-Q-Learning-Policy-Gradient-Advantage-Actor-Critic-and-Deep-Q-Network--VmlldzoxNjI5Njg2Ng)
+* Parker Riggs
+  * Q-Learning, REINFORCE, PPO, AdaptiveRushBot LLM-guided (5×5 GridMaze env)
+  * [Code](https://github.com/<your-username>/CS4880/tree/main/Assignment%208)
+  * [WandB Report](<paste WandB report link here after running rl_zoo.py>)
