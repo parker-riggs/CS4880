@@ -33,7 +33,7 @@ from typing import Callable
 import numpy as np
 import wandb
 
-import q_learning_agent as ql_mod
+import qlearning_agent as ql_mod
 import reinforce_agent as rf_mod
 import ppo_agent as ppo_mod
 from maze_env import MazeEnv
