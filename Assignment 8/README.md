@@ -12,7 +12,7 @@ This project compares **four reinforcement learning approaches** on a shared tes
 
 | # | Algorithm | Paradigm | File |
 |---|-----------|----------|------|
-| 1 | **Q-Learning** | Value-Based | `q_learning_agent.py` |
+| 1 | **Q-Learning** | Value-Based | `qlearning_agent.py` |
 | 2 | **REINFORCE** | Policy-Based (no value function) | `reinforce_agent.py` |
 | 3 | **PPO** | Hybrid (Actor-Critic) | `ppo_agent.py` |
 | 4 | **AdaptiveRushBot** | Candidate MicroRTS Bot (LLM-guided) | `AdaptiveRushBot.java` |
@@ -93,7 +93,7 @@ This makes the bot always functional regardless of LLM availability, which is cr
 ```
 Assignment 8/
 ├── maze_env.py          # 5×5 GridMaze environment (shared by all Python agents)
-├── q_learning_agent.py  # Algorithm 1: Q-Learning (value-based, tabular)
+├── qlearning_agent.py   # Algorithm 1: Q-Learning (value-based, tabular)
 ├── reinforce_agent.py   # Algorithm 2: REINFORCE (policy-based, MLP)
 ├── ppo_agent.py         # Algorithm 3: PPO (hybrid actor-critic, MLP)
 ├── rl_zoo.py            # Main comparison runner + WandB logging
@@ -104,24 +104,55 @@ Assignment 8/
 
 ---
 
-## Setup
+## Setup (Fresh System)
 
-### Prerequisites
-- Python 3.10+
-- A WandB account (free at [wandb.ai](https://wandb.ai)) — or use `--offline` mode
+### 1. Prerequisites
 
-### Install dependencies
+- **Python 3.10 or newer** — download from [python.org](https://www.python.org/downloads/)  
+  Verify: `python --version`
+- **Git** — to clone the repo (download from [git-scm.com](https://git-scm.com))  
+  Verify: `git --version`
+- **A WandB account** — free at [wandb.ai](https://wandb.ai) (or use `--offline` mode to skip this)
+
+### 2. Clone the repository
 
 ```bash
-# From the repo root, with your venv active:
+git clone https://github.com/<your-username>/CS4880.git
+cd CS4880
+```
+
+### 3. Create and activate a virtual environment
+
+**Windows (PowerShell):**
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+**macOS / Linux:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+> Your prompt should now show `(.venv)` — all packages install into this isolated environment.
+
+### 4. Install dependencies
+
+```bash
 pip install -r "Assignment 8/requirements.txt"
 ```
 
-### Log in to WandB (first time only)
+This installs `numpy`, `torch`, and `wandb`.
+
+### 5. Log in to WandB (first time only)
 
 ```bash
 wandb login
 ```
+
+Paste your API key from [wandb.ai/authorize](https://wandb.ai/authorize) when prompted.  
+Skip this step entirely if you plan to use `--offline` mode.
 
 ---
 
@@ -154,9 +185,9 @@ python rl_zoo.py --episodes 5000 --seed 0 --project rl-algorithm-zoo
 Each agent module has a `__main__` block for quick standalone testing:
 
 ```bash
-python q_learning_agent.py   # trains Q-Learning, prints last-100 avg
-python reinforce_agent.py    # trains REINFORCE
-python ppo_agent.py          # trains PPO
+python qlearning_agent.py   # trains Q-Learning, prints last-100 avg
+python reinforce_agent.py   # trains REINFORCE
+python ppo_agent.py         # trains PPO
 ```
 
 ---
