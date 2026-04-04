@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>The Forgotten Realm</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ── Start Screen ──────────────────────────────────── -->
+<div id="start-screen">
+    <div class="start-box">
+        <h1>&#9876; The Forgotten Realm</h1>
+        <p class="subtitle">An AI-Powered RPG</p>
+
+        <div class="form-group">
+            <label for="char-name">Character Name</label>
+            <input type="text" id="char-name" placeholder="Enter your name..." maxlength="30" autocomplete="off">
+        </div>
+
+        <div class="form-group">
+            <label>Choose Your Class</label>
+            <div class="class-grid">
+                <button class="class-btn selected" data-class="Warrior">&#9876; Warrior</button>
+                <button class="class-btn" data-class="Rogue">&#128279; Rogue</button>
+                <button class="class-btn" data-class="Wizard">&#10024; Wizard</button>
+                <button class="class-btn" data-class="Cleric">&#9728; Cleric</button>
+            </div>
+        </div>
+
+        <button id="begin-btn" class="primary-btn">Enter the World</button>
+    </div>
+</div>
+
+<!-- ── Game Screen ───────────────────────────────────── -->
+<div id="game-screen" class="hidden">
+
+    <!-- HUD bar -->
+    <div id="hud">
+        <div id="hud-left">
+            <span id="hud-name">Hero</span>
+            <span class="hud-sep">·</span>
+            <span id="hud-class">Warrior</span>
+        </div>
+        <div id="hud-center">
+            <span>WASD / &#8592;&#8593;&#8595;&#8594; Move</span>
+            <span class="hud-sep">·</span>
+            <span>E Interact</span>
+            <span class="hud-sep">·</span>
+            <span>Esc Close</span>
+        </div>
+        <div id="hud-right">
+            <button id="music-toggle" class="hud-btn active">&#127925;</button>
+            <button id="restart-btn" class="hud-btn">&#8635; New Game</button>
+        </div>
+    </div>
+
+    <!-- Main canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Interaction hint bar -->
+    <div id="hint-bar"></div>
+
+    <!-- Sign / Note overlay -->
+    <div id="sign-box" class="overlay hidden">
+        <div class="sign-inner">
+            <pre id="sign-text"></pre>
+            <p class="overlay-close">[ Press E or Esc to close ]</p>
+        </div>
+    </div>
+
+    <!-- NPC Dialogue overlay -->
+    <div id="dialogue-box" class="overlay hidden">
+        <div class="dlg-inner">
+            <div class="dlg-header">
+                <div id="dlg-portrait">&#128100;</div>
+                <span id="dlg-name">NPC</span>
+            </div>
+            <div id="dlg-text">...</div>
+            <div id="dlg-options"></div>
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/game.js"></script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=IM+Fell+English&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #060609;
+    color: #d4b896;
+    font-family: 'IM Fell English', serif;
+}
+
+.hidden { display: none !important; }
+
+/* ── Start Screen ──────────────────────────────── */
+#start-screen {
+    width: 100%; height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(80,20,20,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(20,20,80,0.12) 0%, transparent 60%);
+}
+
+.start-box {
+    background: rgba(12,8,4,0.96);
+    border: 1px solid #5a3e28; border-radius: 8px;
+    padding: 48px 56px; width: 480px; text-align: center;
+    box-shadow: 0 0 60px rgba(180,100,20,0.1), inset 0 0 40px rgba(0,0,0,0.5);
+}
+
+.start-box h1 {
+    font-family: 'Cinzel', serif; font-size: 2rem; color: #c8922a;
+    text-shadow: 0 0 20px rgba(200,146,42,0.45);
+    margin-bottom: 6px; letter-spacing: 2px;
+}
+.subtitle { color: #8a7060; font-size: 0.9rem; margin-bottom: 36px; letter-spacing: 1px; }
+
+.form-group { margin-bottom: 24px; text-align: left; }
+.form-group label {
+    display: block; font-size: 0.78rem; color: #a08060;
+    margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase;
+}
+.form-group input {
+    width: 100%; background: rgba(255,255,255,0.04);
+    border: 1px solid #4a3020; border-radius: 4px;
+    padding: 10px 14px; color: #d4b896;
+    font-family: 'IM Fell English', serif; font-size: 1rem; outline: none;
+    transition: border-color 0.2s;
+}
+.form-group input:focus { border-color: #c8922a; }
+.form-group input::placeholder { color: #5a4030; }
+
+.class-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.class-btn {
+    background: rgba(255,255,255,0.03); border: 1px solid #4a3020; border-radius: 4px;
+    color: #a08060; font-family: 'IM Fell English', serif; font-size: 0.95rem;
+    padding: 10px; cursor: pointer; transition: all 0.2s;
+}
+.class-btn:hover { border-color: #c8922a; color: #d4b896; background: rgba(200,146,42,0.08); }
+.class-btn.selected { border-color: #c8922a; color: #c8922a; background: rgba(200,146,42,0.12); }
+
+.primary-btn {
+    margin-top: 8px; width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #7a4a10, #c8922a);
+    border: none; border-radius: 4px; color: #1a0f05;
+    font-family: 'Cinzel', serif; font-size: 1rem; font-weight: 700;
+    letter-spacing: 2px; cursor: pointer; text-transform: uppercase;
+    transition: opacity 0.2s, transform 0.1s;
+}
+.primary-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* ── Game Screen ───────────────────────────────── */
+#game-screen {
+    display: flex; flex-direction: column;
+    width: 100vw; height: 100vh;
+}
+
+/* HUD */
+#hud {
+    display: flex; align-items: center; gap: 16px;
+    height: 40px; padding: 0 16px; flex-shrink: 0;
+    background: rgba(8,5,2,0.97);
+    border-bottom: 1px solid #2a1808;
+}
+
+#hud-left {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Cinzel', serif; font-size: 0.85rem; color: #d4b896;
+}
+.hud-sep { color: #4a3020; }
+
+#hud-center {
+    flex: 1; text-align: center;
+    font-size: 0.72rem; color: #6a5040; letter-spacing: 0.5px;
+    display: flex; gap: 12px; justify-content: center; align-items: center;
+}
+
+#hud-right { display: flex; gap: 8px; align-items: center; }
+
+.hud-btn {
+    background: rgba(60,30,10,0.4); border: 1px solid #3a2010; border-radius: 3px;
+    color: #7a6050; font-size: 0.8rem; padding: 4px 10px;
+    cursor: pointer; transition: all 0.2s;
+    font-family: 'IM Fell English', serif;
+}
+.hud-btn:hover { border-color: #c8922a; color: #d4b896; }
+.hud-btn.active { border-color: #c8922a; color: #c8922a; background: rgba(200,146,42,0.1); }
+
+/* Canvas */
+#game-canvas {
+    display: block; flex: 1;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+/* Hint bar */
+#hint-bar {
+    height: 26px; line-height: 26px;
+    text-align: center; font-size: 0.78rem;
+    color: #c8922a; letter-spacing: 1px;
+    background: rgba(8,5,2,0.97);
+    border-top: 1px solid #2a1808;
+    flex-shrink: 0;
+}
+
+/* ── Overlays ──────────────────────────────────── */
+.overlay {
+    position: fixed; z-index: 100;
+    pointer-events: all;
+}
+
+/* Sign overlay — center of screen */
+#sign-box {
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 460px; width: 90%;
+}
+
+.sign-inner {
+    background: rgba(20,14,6,0.97);
+    border: 2px solid #8a6020; border-radius: 6px;
+    padding: 32px 36px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8), 0 0 0 4px rgba(100,60,10,0.15);
+}
+
+#sign-text {
+    font-family: 'IM Fell English', serif;
+    font-size: 1rem; line-height: 1.8;
+    color: #d4b896; white-space: pre-wrap;
+    margin-bottom: 20px;
+}
+
+.overlay-close {
+    text-align: center; font-size: 0.78rem;
+    color: #6a5030; letter-spacing: 1px;
+}
+
+/* Dialogue overlay — bottom of screen */
+#dialogue-box {
+    bottom: 26px; left: 50%;
+    transform: translateX(-50%);
+    width: min(680px, 96vw);
+}
+
+.dlg-inner {
+    background: rgba(10,6,2,0.97);
+    border: 1px solid #5a3a18; border-radius: 6px;
+    padding: 20px 24px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.9);
+}
+
+.dlg-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #3a2010; padding-bottom: 10px;
+}
+
+#dlg-portrait { font-size: 1.6rem; line-height: 1; }
+
+#dlg-name {
+    font-family: 'Cinzel', serif; font-size: 1rem;
+    color: #c8922a; letter-spacing: 1px;
+}
+
+#dlg-text {
+    font-size: 1rem; line-height: 1.75;
+    color: #d4b896; margin-bottom: 16px;
+    min-height: 2.5rem;
+}
+
+#dlg-options {
+    display: flex; flex-direction: column; gap: 8px;
+}
+
+.dlg-opt {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid #4a3018; border-radius: 4px;
+    color: #c8a878; font-family: 'IM Fell English', serif;
+    font-size: 0.92rem; padding: 10px 16px;
+    text-align: left; cursor: pointer; transition: all 0.15s;
+}
+.dlg-opt:hover {
+    background: rgba(200,146,42,0.1);
+    border-color: #c8922a; color: #e8c890;
+    transform: translateX(3px);
+}
+.dlg-opt:disabled { opacity: 0.5; cursor: not-allowed; }
