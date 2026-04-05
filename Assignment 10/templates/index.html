@@ -9,27 +9,140 @@
 
 <!-- ── Start Screen ──────────────────────────────────── -->
 <div id="start-screen">
-    <div class="start-box">
-        <h1>&#9876; The Forgotten Realm</h1>
-        <p class="subtitle">An AI-Powered RPG</p>
+
+    <!-- Animated background -->
+    <canvas id="menu-canvas"></canvas>
+
+    <!-- ① Main Menu -->
+    <div id="menu-main" class="menu-panel">
+        <div class="menu-title-block">
+            <div class="title-deco">&#10022; &#9876; &#10022;</div>
+            <h1 id="menu-title">The Forgotten Realm</h1>
+            <p class="menu-tagline">A Dark Fantasy · AI-Powered RPG</p>
+            <div class="title-rule"><span></span><span class="rule-gem">&#9670;</span><span></span></div>
+        </div>
+        <nav class="menu-nav">
+            <button class="menu-btn" id="btn-new-game">
+                <span class="btn-icon">&#9876;</span> New Game
+            </button>
+            <button class="menu-btn" id="btn-how-to-play">
+                <span class="btn-icon">&#128214;</span> How to Play
+            </button>
+            <button class="menu-btn" id="btn-credits">
+                <span class="btn-icon">&#10022;</span> Credits
+            </button>
+        </nav>
+        <p class="menu-footer">Powered by Groq &middot; Llama 3.3 &middot; Flask</p>
+    </div>
+
+    <!-- ② Character Creation -->
+    <div id="menu-create" class="menu-panel hidden">
+        <div class="panel-header">
+            <button class="back-btn" id="btn-back-create">&#8592; Back</button>
+            <h2>Create Your Hero</h2>
+        </div>
+        <div class="create-rule"></div>
 
         <div class="form-group">
-            <label for="char-name">Character Name</label>
+            <label for="char-name">Your Name</label>
             <input type="text" id="char-name" placeholder="Enter your name..." maxlength="30" autocomplete="off">
         </div>
 
         <div class="form-group">
-            <label>Choose Your Class</label>
+            <label>Choose a Class</label>
             <div class="class-grid">
-                <button class="class-btn selected" data-class="Warrior">&#9876; Warrior</button>
-                <button class="class-btn" data-class="Rogue">&#128279; Rogue</button>
-                <button class="class-btn" data-class="Wizard">&#10024; Wizard</button>
-                <button class="class-btn" data-class="Cleric">&#9728; Cleric</button>
+                <button class="class-card selected" data-class="Warrior">
+                    <div class="card-icon">&#9876;</div>
+                    <div class="card-name">Warrior</div>
+                    <div class="card-desc">Iron-willed fighter. Masters of blade and shield.</div>
+                </button>
+                <button class="class-card" data-class="Rogue">
+                    <div class="card-icon">&#128279;</div>
+                    <div class="card-name">Rogue</div>
+                    <div class="card-desc">Swift and cunning. Strikes from the shadows.</div>
+                </button>
+                <button class="class-card" data-class="Wizard">
+                    <div class="card-icon">&#10024;</div>
+                    <div class="card-name">Wizard</div>
+                    <div class="card-desc">Wielder of arcane forces. Power and fragility.</div>
+                </button>
+                <button class="class-card" data-class="Cleric">
+                    <div class="card-icon">&#9728;</div>
+                    <div class="card-name">Cleric</div>
+                    <div class="card-desc">Blessed by the Old Gods. Healer and protector.</div>
+                </button>
             </div>
         </div>
 
-        <button id="begin-btn" class="primary-btn">Enter the World</button>
+        <button id="begin-btn" class="primary-btn">&#9876; Enter the World</button>
     </div>
+
+    <!-- ③ How to Play -->
+    <div id="menu-howto" class="menu-panel hidden">
+        <div class="panel-header">
+            <button class="back-btn" id="btn-back-howto">&#8592; Back</button>
+            <h2>How to Play</h2>
+        </div>
+        <div class="create-rule"></div>
+        <div class="howto-grid">
+            <div class="howto-row">
+                <div class="howto-key">W A S D<br><span>or &#8592;&#8593;&#8595;&#8594;</span></div>
+                <div class="howto-desc">Move your character through the world</div>
+            </div>
+            <div class="howto-row">
+                <div class="howto-key">E</div>
+                <div class="howto-desc">Interact — talk to NPCs, read signs, descend stairs</div>
+            </div>
+            <div class="howto-row">
+                <div class="howto-key">Esc</div>
+                <div class="howto-desc">Close any open dialogue or sign</div>
+            </div>
+            <div class="howto-row">
+                <div class="howto-key">&#127925;</div>
+                <div class="howto-desc">Toggle ambient music from the HUD bar</div>
+            </div>
+        </div>
+        <div class="howto-tip">
+            <span class="tip-label">&#9670; Tip</span>
+            Walk up to an NPC or sign and a <strong>!</strong> will appear above them.
+            The world lore is told through conversations — explore and ask questions.
+        </div>
+    </div>
+
+    <!-- ④ Credits -->
+    <div id="menu-credits" class="menu-panel hidden">
+        <div class="panel-header">
+            <button class="back-btn" id="btn-back-credits">&#8592; Back</button>
+            <h2>Credits</h2>
+        </div>
+        <div class="create-rule"></div>
+        <div class="credits-block">
+            <div class="credits-section">
+                <p class="credits-role">Game Design &amp; Development</p>
+                <p class="credits-name">Parker Riggs</p>
+                <p class="credits-note">CS4880 — Assignment 10</p>
+            </div>
+            <div class="credits-divider">&#10022;</div>
+            <div class="credits-section">
+                <p class="credits-role">AI Narrative Engine</p>
+                <p class="credits-name">Llama 3.3 · 70B</p>
+                <p class="credits-note">via Groq Cloud Inference</p>
+            </div>
+            <div class="credits-divider">&#10022;</div>
+            <div class="credits-section">
+                <p class="credits-role">Text-to-Speech</p>
+                <p class="credits-name">Microsoft Edge TTS</p>
+                <p class="credits-note">ChristopherNeural voice</p>
+            </div>
+            <div class="credits-divider">&#10022;</div>
+            <div class="credits-section">
+                <p class="credits-role">Built With</p>
+                <p class="credits-name">Python · Flask · HTML5 Canvas</p>
+                <p class="credits-note">No game engine — custom from scratch</p>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- ── Game Screen ───────────────────────────────────── -->
@@ -83,6 +196,99 @@
 
 </div>
 
+<script>
+// ── Menu particle background ──────────────────────────
+const mc  = document.getElementById('menu-canvas');
+const mct = mc.getContext('2d');
+
+function resizeMenuCanvas() {
+    mc.width  = window.innerWidth;
+    mc.height = window.innerHeight;
+}
+resizeMenuCanvas();
+window.addEventListener('resize', resizeMenuCanvas);
+
+const EMBER_COUNT = 55;
+const embers = Array.from({ length: EMBER_COUNT }, () => spawnEmber(true));
+
+function spawnEmber(randomY) {
+    return {
+        x:    Math.random() * window.innerWidth,
+        y:    randomY ? Math.random() * window.innerHeight : window.innerHeight + 10,
+        vx:   (Math.random() - 0.5) * 0.4,
+        vy:   -(Math.random() * 0.6 + 0.25),
+        r:    Math.random() * 2.2 + 0.6,
+        maxA: Math.random() * 0.7 + 0.2,
+        life: 0,
+        max:  Math.random() * 320 + 180,
+        warm: Math.random() < 0.65,
+    };
+}
+
+function menuLoop() {
+    mct.clearRect(0, 0, mc.width, mc.height);
+
+    // Atmospheric fog blobs
+    const t = Date.now() / 1000;
+    const blobs = [
+        { x: mc.width*0.2, y: mc.height*0.6, r: mc.width*0.35, c:'rgba(60,15,15,' },
+        { x: mc.width*0.8, y: mc.height*0.3, r: mc.width*0.3,  c:'rgba(15,15,55,' },
+        { x: mc.width*0.5, y: mc.height*0.8, r: mc.width*0.25, c:'rgba(40,10,10,' },
+    ];
+    for (const b of blobs) {
+        const a = 0.06 + 0.02 * Math.sin(t * 0.3 + b.x);
+        const g = mct.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+        g.addColorStop(0,   b.c + a + ')');
+        g.addColorStop(1,   b.c + '0)');
+        mct.fillStyle = g;
+        mct.beginPath(); mct.arc(b.x, b.y, b.r, 0, Math.PI*2); mct.fill();
+    }
+
+    // Embers
+    for (const e of embers) {
+        e.x += e.vx; e.y += e.vy; e.life++;
+        if (e.life >= e.max || e.y < -10) Object.assign(e, spawnEmber(false), {life:0});
+        const fade = Math.min(1, Math.min(e.life / 40, (e.max - e.life) / 40));
+        mct.globalAlpha = e.maxA * fade;
+        mct.fillStyle = e.warm ? '#c8922a' : '#e8d090';
+        mct.beginPath(); mct.arc(e.x, e.y, e.r, 0, Math.PI*2); mct.fill();
+    }
+    mct.globalAlpha = 1;
+
+    if (!document.getElementById('start-screen').classList.contains('hidden')) {
+        requestAnimationFrame(menuLoop);
+    }
+}
+menuLoop();
+
+// ── Panel navigation ──────────────────────────────────
+function showPanel(id) {
+    document.querySelectorAll('.menu-panel').forEach(p => {
+        p.classList.add('hidden');
+        p.style.opacity = '0';
+    });
+    const el = document.getElementById(id);
+    el.classList.remove('hidden');
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+}
+
+showPanel('menu-main');
+
+document.getElementById('btn-new-game').addEventListener('click',    () => showPanel('menu-create'));
+document.getElementById('btn-how-to-play').addEventListener('click', () => showPanel('menu-howto'));
+document.getElementById('btn-credits').addEventListener('click',     () => showPanel('menu-credits'));
+document.getElementById('btn-back-create').addEventListener('click', () => showPanel('menu-main'));
+document.getElementById('btn-back-howto').addEventListener('click',  () => showPanel('menu-main'));
+document.getElementById('btn-back-credits').addEventListener('click',() => showPanel('menu-main'));
+
+// ── Class card selection ──────────────────────────────
+document.querySelectorAll('.class-card').forEach(card => {
+    card.addEventListener('click', () => {
+        document.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+    });
+});
+</script>
 <script src="/static/game.js"></script>
 </body>
 </html>

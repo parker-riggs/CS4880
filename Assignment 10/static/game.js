@@ -563,7 +563,7 @@ const SCALE = [110,123.47,130.81,146.83,164.81,174.61,196,220,246.94,261.63,293.
 
 function startMusic() {
     if (audioCtx) return;
-    audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx   = new (window.AudioContext || window['webkitAudioContext'])();
     masterGain = audioCtx.createGain(); masterGain.gain.value = 0.25;
 
     const delay = audioCtx.createDelay(3); delay.delayTime.value = 0.45;
@@ -657,7 +657,8 @@ function startGame(name, charClass) {
 
     resizeCanvas();
 
-    document.getElementById('start-screen').classList.add('hidden');
+    const ss = document.getElementById('start-screen');
+    ss.classList.add('hidden');
     document.getElementById('game-screen').classList.remove('hidden');
     document.getElementById('hud-name').textContent  = name;
     document.getElementById('hud-class').textContent = charClass;
@@ -666,24 +667,26 @@ function startGame(name, charClass) {
     requestAnimationFrame(loop);
 }
 
-// Start screen wiring
-document.querySelectorAll('.class-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.class-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-    });
-});
-
 document.getElementById('begin-btn').addEventListener('click', () => {
     const name      = document.getElementById('char-name').value.trim() || 'Hero';
-    const charClass = document.querySelector('.class-btn.selected')?.dataset.class || 'Warrior';
+    const charClass = document.querySelector('.class-card.selected')?.dataset.class || 'Warrior';
     startGame(name, charClass);
 });
 
 document.getElementById('restart-btn').addEventListener('click', () => {
     stopMusic();
     document.getElementById('game-screen').classList.add('hidden');
-    document.getElementById('start-screen').classList.remove('hidden');
+    const ss = document.getElementById('start-screen');
+    ss.classList.remove('hidden');
+    // Return to main menu panel
+    document.querySelectorAll('.menu-panel').forEach(p => {
+        p.classList.add('hidden'); p.style.opacity = '0';
+    });
+    const main = document.getElementById('menu-main');
+    main.classList.remove('hidden');
+    requestAnimationFrame(() => { main.style.opacity = '1'; });
+    // Restart particle loop
+    menuLoop && menuLoop();
     closeDialogue(); closeSign();
 });
 

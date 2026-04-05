@@ -13,30 +13,131 @@ html, body {
 
 /* ── Start Screen ──────────────────────────────── */
 #start-screen {
+    position: relative;
     width: 100%; height: 100vh;
     display: flex; align-items: center; justify-content: center;
-    background-image:
-        radial-gradient(ellipse at 20% 50%, rgba(80,20,20,0.12) 0%, transparent 60%),
-        radial-gradient(ellipse at 80% 20%, rgba(20,20,80,0.12) 0%, transparent 60%);
+    background: #060609;
+    overflow: hidden;
 }
 
-.start-box {
-    background: rgba(12,8,4,0.96);
-    border: 1px solid #5a3e28; border-radius: 8px;
-    padding: 48px 56px; width: 480px; text-align: center;
-    box-shadow: 0 0 60px rgba(180,100,20,0.1), inset 0 0 40px rgba(0,0,0,0.5);
+#menu-canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
 }
 
-.start-box h1 {
-    font-family: 'Cinzel', serif; font-size: 2rem; color: #c8922a;
-    text-shadow: 0 0 20px rgba(200,146,42,0.45);
-    margin-bottom: 6px; letter-spacing: 2px;
+/* Panel system */
+.menu-panel {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 520px;
+    padding: 0 20px;
+    transition: opacity 0.3s ease;
 }
-.subtitle { color: #8a7060; font-size: 0.9rem; margin-bottom: 36px; letter-spacing: 1px; }
+.menu-panel.hidden { display: none; }
 
-.form-group { margin-bottom: 24px; text-align: left; }
+/* ── Main Menu ─────────────────────────────────── */
+.menu-title-block { text-align: center; margin-bottom: 48px; }
+
+.title-deco {
+    font-size: 1rem; color: #6a4a20;
+    letter-spacing: 8px; margin-bottom: 14px;
+}
+
+#menu-title {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(2rem, 5vw, 3rem);
+    color: #c8922a;
+    text-shadow: 0 0 30px rgba(200,146,42,0.5), 0 0 60px rgba(200,146,42,0.2);
+    letter-spacing: 3px; margin-bottom: 10px;
+    line-height: 1.15;
+}
+
+.menu-tagline {
+    color: #7a6040; font-size: 0.85rem;
+    letter-spacing: 2px; margin-bottom: 22px;
+    text-transform: uppercase;
+}
+
+.title-rule {
+    display: flex; align-items: center; gap: 12px;
+    justify-content: center;
+}
+.title-rule span:first-child,
+.title-rule span:last-child {
+    flex: 1; max-width: 100px;
+    height: 1px; background: linear-gradient(to right, transparent, #5a3a18);
+}
+.title-rule span:last-child {
+    background: linear-gradient(to left, transparent, #5a3a18);
+}
+.rule-gem { color: #c8922a; font-size: 0.7rem; }
+
+.menu-nav {
+    display: flex; flex-direction: column; gap: 4px;
+    margin-bottom: 40px;
+}
+
+.menu-btn {
+    background: transparent;
+    border: none; border-top: 1px solid #2a1a08;
+    color: #c8a870;
+    font-family: 'Cinzel', serif; font-size: 1.05rem;
+    letter-spacing: 3px; text-transform: uppercase;
+    padding: 18px 24px;
+    cursor: pointer; text-align: center;
+    transition: all 0.22s ease;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    position: relative;
+}
+.menu-btn:last-child { border-bottom: 1px solid #2a1a08; }
+
+.menu-btn::after {
+    content: '';
+    position: absolute; bottom: 0; left: 50%;
+    width: 0; height: 1px;
+    background: #c8922a;
+    transition: width 0.25s ease, left 0.25s ease;
+}
+.menu-btn:hover { color: #e8d090; letter-spacing: 5px; }
+.menu-btn:hover::after { width: 60%; left: 20%; }
+.menu-btn:hover .btn-icon { text-shadow: 0 0 12px #c8922a; }
+
+.btn-icon { font-size: 0.85rem; opacity: 0.7; }
+
+.menu-footer {
+    text-align: center; font-size: 0.7rem;
+    color: #3a2a14; letter-spacing: 2px; text-transform: uppercase;
+}
+
+/* ── Shared Panel Styles ───────────────────────── */
+.panel-header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 8px;
+}
+.panel-header h2 {
+    font-family: 'Cinzel', serif; font-size: 1.3rem;
+    color: #c8922a; letter-spacing: 2px; flex: 1;
+}
+
+.back-btn {
+    background: transparent; border: 1px solid #3a2010;
+    border-radius: 3px; color: #7a6040;
+    font-family: 'IM Fell English', serif; font-size: 0.85rem;
+    padding: 5px 12px; cursor: pointer; transition: all 0.2s;
+    white-space: nowrap;
+}
+.back-btn:hover { border-color: #c8922a; color: #d4b896; }
+
+.create-rule {
+    height: 1px;
+    background: linear-gradient(to right, transparent, #5a3a18, transparent);
+    margin-bottom: 24px;
+}
+
+/* ── Character Creation ────────────────────────── */
+.form-group { margin-bottom: 20px; }
 .form-group label {
-    display: block; font-size: 0.78rem; color: #a08060;
+    display: block; font-size: 0.75rem; color: #a08060;
     margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase;
 }
 .form-group input {
@@ -50,23 +151,87 @@ html, body {
 .form-group input::placeholder { color: #5a4030; }
 
 .class-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.class-btn {
-    background: rgba(255,255,255,0.03); border: 1px solid #4a3020; border-radius: 4px;
-    color: #a08060; font-family: 'IM Fell English', serif; font-size: 0.95rem;
-    padding: 10px; cursor: pointer; transition: all 0.2s;
+
+.class-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid #3a2010; border-radius: 6px;
+    padding: 14px 12px; cursor: pointer;
+    text-align: center; transition: all 0.2s;
+    display: flex; flex-direction: column; gap: 5px;
 }
-.class-btn:hover { border-color: #c8922a; color: #d4b896; background: rgba(200,146,42,0.08); }
-.class-btn.selected { border-color: #c8922a; color: #c8922a; background: rgba(200,146,42,0.12); }
+.class-card:hover {
+    border-color: #8a5a20; background: rgba(200,146,42,0.06);
+}
+.class-card.selected {
+    border-color: #c8922a; background: rgba(200,146,42,0.1);
+    box-shadow: 0 0 16px rgba(200,146,42,0.12);
+}
+.card-icon { font-size: 1.4rem; }
+.card-name {
+    font-family: 'Cinzel', serif; font-size: 0.82rem;
+    color: #c8922a; letter-spacing: 1px;
+}
+.class-card:not(.selected) .card-name { color: #a08060; }
+.card-desc {
+    font-size: 0.75rem; color: #7a6040; line-height: 1.4;
+}
+.class-card.selected .card-desc { color: #a08060; }
 
 .primary-btn {
-    margin-top: 8px; width: 100%; padding: 14px;
+    margin-top: 16px; width: 100%; padding: 14px;
     background: linear-gradient(135deg, #7a4a10, #c8922a);
     border: none; border-radius: 4px; color: #1a0f05;
-    font-family: 'Cinzel', serif; font-size: 1rem; font-weight: 700;
-    letter-spacing: 2px; cursor: pointer; text-transform: uppercase;
-    transition: opacity 0.2s, transform 0.1s;
+    font-family: 'Cinzel', serif; font-size: 0.95rem; font-weight: 700;
+    letter-spacing: 3px; cursor: pointer; text-transform: uppercase;
+    transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
 }
-.primary-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.primary-btn:hover {
+    opacity: 0.92; transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(200,146,42,0.3);
+}
+
+/* ── How to Play ───────────────────────────────── */
+.howto-grid { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }
+
+.howto-row {
+    display: flex; align-items: center; gap: 20px;
+    padding: 14px 0; border-bottom: 1px solid #1e1208;
+}
+.howto-key {
+    font-family: 'Cinzel', serif; font-size: 0.75rem;
+    color: #c8922a; letter-spacing: 1px; text-align: center;
+    min-width: 80px; line-height: 1.5;
+}
+.howto-key span { color: #7a6040; font-size: 0.68rem; }
+.howto-desc { font-size: 0.9rem; color: #a08060; line-height: 1.5; }
+
+.howto-tip {
+    background: rgba(200,146,42,0.05);
+    border: 1px solid #3a2a10; border-radius: 4px;
+    padding: 14px 16px; font-size: 0.85rem; color: #8a7050; line-height: 1.6;
+}
+.tip-label {
+    font-family: 'Cinzel', serif; font-size: 0.75rem;
+    color: #c8922a; letter-spacing: 1px; display: block; margin-bottom: 6px;
+}
+.howto-tip strong { color: #c8922a; }
+
+/* ── Credits ───────────────────────────────────── */
+.credits-block { display: flex; flex-direction: column; gap: 0; }
+.credits-section { padding: 16px 0; text-align: center; }
+.credits-role {
+    font-size: 0.72rem; color: #6a5030; letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 6px;
+}
+.credits-name {
+    font-family: 'Cinzel', serif; font-size: 1rem;
+    color: #d4b896; letter-spacing: 1px; margin-bottom: 4px;
+}
+.credits-note { font-size: 0.8rem; color: #5a4030; }
+.credits-divider {
+    text-align: center; color: #3a2010; font-size: 0.7rem;
+    padding: 4px 0;
+}
 
 /* ── Game Screen ───────────────────────────────── */
 #game-screen {
