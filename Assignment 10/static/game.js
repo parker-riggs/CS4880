@@ -19,32 +19,129 @@ const { GRASS:G, PATH:P, FLOOR:F, WALL:W, TREE:TR,
 // ═══════════════════════════════════════════════════════
 //  MAP TILE DATA
 // ═══════════════════════════════════════════════════════
-const VILLAGE_TILES = [
-//   0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19  20  21  22  23  24  25  26  27  28  29
-  [TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR],
-  [TR,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  W,  W,  W,  W,  G,  G,  G,  G,  G,  G,  W,  W,  W,  W,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  W,  F,  F,  W,  G,  G,  G,  G,  G,  G,  W,  F,  F,  W,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  W,  F,  F,  W,  G,  G,  G,  G,  G,  G,  W,  F,  F,  W,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  W,  W, DR,  W,  G,  G,  G,  G,  G,  G,  W,  W, DR,  W,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G, SG,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  P,  P,  P,  P,  P,  P,  P,  P,  P,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR,  G,  G,  G,  G,  P,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G,  G, TR],
-  [TR, TR, TR, TR, TR,  P, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR],
-  [TR, TR, TR, TR, TR, ST, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR],
-];
+function buildVillageTiles() {
+    const W_=48, H_=36;
+    const m = Array.from({length:H_}, () => new Array(W_).fill(TR));
+    const s = (x,y,t) => { if(y>=0&&y<H_&&x>=0&&x<W_) m[y][x]=t; };
+    const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
+    const house = (x1,y1,x2,y2) => { fill(x1,y1,x2,y2,W); fill(x1+1,y1+1,x2-1,y2-1,F); };
+
+    // ── 1. Playable ground ───────────────────────────────────
+    fill(1,1,46,34, G);
+
+    // ── 2. Main roads ────────────────────────────────────────
+    // N–S spine x=21,22; E–W spine y=16,17
+    // All buildings stay clear of these columns/rows.
+    fill(21,1,22,34, P);
+    fill(1,16,46,17, P);
+
+    // ── 3. Decorative tree fills (placed before buildings so
+    //        buildings/paths naturally overwrite them) ────────
+    fill(31,2,32,11, TR);   // forest strip between Merchant and Blacksmith
+    fill(44,2,46,15, TR);   // east border fringe NE
+    fill(44,18,46,27, TR);  // east border fringe SE
+    fill(37,29,43,34, TR);  // SE corner south of chapel
+
+    // ── 4. Pond (NW decorative water feature) ────────────────
+    //  Water: x=13–19, y=3–12  (safely west of N–S road x=21)
+    fill(13,3,19,12, WA);
+    fill(12,2,20,2,  P);    // north rim path
+    fill(12,13,20,13,P);    // south rim path
+    fill(12,2,12,13, P);    // west rim path
+    // east rim is x=20, adjacent to N–S road at x=21 (already path)
+
+    // ── 5. Buildings ──────────────────────────────────────────
+    // Layout (verified non-overlapping, no road tiles covered):
+    //   A: Elder's Hall    x= 2–11, y= 2–11   (NW)
+    //   B: Merchant House  x=24–30, y= 2– 9   (NE upper)
+    //   C: Blacksmith      x=33–43, y= 2–11   (NE)
+    //   D: Tavern          x= 2–12, y=19–27   (SW)
+    //   E: Market Hall     x=24–36, y=19–27   (SE upper)
+    //   F: Small Cottage   x= 2– 9, y=29–34   (SW lower)
+    //   G: Chapel          x=27–36, y=29–34   (SE lower)
+    //   H: Veyla's Cottage x=38–45, y=19–26   (SE right)
+
+    // A: Elder's Hall — 10×10, two-chamber with council room
+    house(2,2, 11,11);
+    for (let x=3;x<=10;x++) s(x,6,W);   // divider wall
+    s(6,6,DR); s(7,6,DR);               // interior arch
+    s(6,11,DR); s(7,11,DR);             // south entrance
+
+    // B: Merchant House — 7×8
+    house(24,2, 30,9);
+    s(26,9,DR); s(27,9,DR);             // south entrance
+
+    // C: Blacksmith — 11×10 with forge partition
+    house(33,2, 43,11);
+    for (let y=3;y<=10;y++) s(39,y,W);  // forge partition at x=39
+    s(39,6,DR); s(39,7,DR);             // forge door
+    s(36,11,DR); s(37,11,DR);           // south entrance
+
+    // D: Tavern — 11×9 with bar divider
+    house(2,19, 12,27);
+    for (let x=3;x<=11;x++) s(x,23,W); // bar wall
+    s(6,23,DR); s(7,23,DR);             // bar passage
+    s(6,19,DR); s(7,19,DR);             // north entrance (faces E–W road gap at y=18)
+    s(5,27,DR); s(6,27,DR);             // south exit
+
+    // E: Market Hall — 13×9
+    house(24,19, 36,27);
+    s(24,22,DR); s(24,23,DR);           // west entrance (faces N–S road at x=22)
+    s(29,27,DR); s(30,27,DR);           // south passage toward chapel
+
+    // F: Small Cottage — 8×6
+    house(2,29, 9,34);
+    s(9,31,DR); s(9,32,DR);             // east entrance
+
+    // G: Chapel — 10×6 with altar alcove
+    house(27,29, 36,34);
+    s(30,29,DR); s(31,29,DR);           // north entrance
+    s(28,30,W); s(29,30,W);             // altar flanking left
+    s(34,30,W); s(35,30,W);             // altar flanking right
+    s(31,30,SG); s(32,30,SG);           // altar plaque (sign tile)
+
+    // H: Veyla's Cottage — 8×8
+    house(38,19, 45,26);
+    s(41,19,DR); s(42,19,DR);           // north entrance (faces E–W road at y=17)
+
+    // ── 6. Connecting paths ───────────────────────────────────
+    // A south exit → E–W road
+    fill(6,12,7,16, P);
+    // Horizontal shortcut east across the NW quadrant to N–S road
+    fill(6,13,20,13, P);
+
+    // B south → E–W road
+    fill(26,10,27,16, P);
+
+    // C south → E–W road
+    fill(36,12,37,16, P);
+
+    // D north door gap (y=18) → E–W road at y=17
+    fill(6,18,7,18, P);
+    // D south step
+    fill(5,28,6,28, P);
+
+    // F east door → N–S road
+    fill(10,31,20,32, P);
+
+    // E west door → N–S road
+    fill(23,22,23,23, P);
+    // E south → G north
+    fill(29,28,31,28, P);
+
+    // H north door gap (y=18) → E–W road at y=17
+    fill(41,18,42,18, P);
+
+    // ── 7. Signs ────────────────────────────────────────────
+    s(21,8,  SG);   // village welcome sign (on N–S road, y=8)
+    s(21,32, SG);   // dungeon warning sign
+
+    // ── 8. Dungeon stairs ────────────────────────────────────
+    s(21,34, ST);
+    s(22,34, ST);
+
+    return m;
+}
 
 function buildDungeonTiles() {
     const rows = 21, cols = 30;
@@ -73,17 +170,17 @@ function buildDungeonTiles() {
 //  WORLD ENTITY DATA
 // ═══════════════════════════════════════════════════════
 const VILLAGE_NPCS = [
-    { id:'elder', name:'Elder Maren', x:4, y:5, portrait:'👴', color:'#d0c870', history:[],
+    { id:'elder', name:'Elder Maren', x:6, y:8, portrait:'👴', color:'#d0c870', history:[],
       role:'The elderly leader of Eldoria. Wise but frightened — darkness spreads from the Cursed Mines to the south. He desperately needs someone to investigate. He will explicitly ask the player to enter the mines, promising a reward. If the player has entered the mines (quest_into_dark_complete=true), he reacts with relief and asks what they found.' },
-    { id:'blacksmith', name:'Daran', x:15, y:4, portrait:'🔨', color:'#d07040', history:[],
+    { id:'blacksmith', name:'Daran', x:37, y:6, portrait:'🔨', color:'#d07040', history:[],
       role:'The village blacksmith. Gruff, grieving. His brother Henrick went into the mines 3 months ago and never returned. He will ask the player to look for any sign of Henrick. If quest_brothers_fate_complete=true (Henrick\'s ring found), he breaks down and thanks the player, and says at least now he knows.' },
-    { id:'traveler', name:'Veyla', x:22, y:10, portrait:'🧝', color:'#70a0e0', history:[],
+    { id:'traveler', name:'Veyla', x:41, y:22, portrait:'🧝', color:'#70a0e0', history:[],
       role:'A mysterious elven wanderer. Cryptic, testing. She knows an ancient sealed entity called the Hollow King lies in the mines. She will ask the player to find the ancient tablet that describes the seal. If quest_sealed_truth_complete=true, she reveals she is a Warden\'s descendant sent to reinforce the seal.' },
 ];
 
 const VILLAGE_SIGNS = [
-    { x:10, y:7, text:'— ELDORIA —\n\nFounded in the Year of the Third Moon.\nPopulation: 23.\n\n"May the Old Gods light your path."' },
-    { x:5, y:21, text:'THE CURSED MINES\n\n"Turn back. Whatever you hear below,\ndo not answer it."\n\n— scratched into the stone by a shaking hand', type:'stairs' },
+    { x:21, y:8, text:'— ELDORIA —\n\nFounded in the Year of the Third Moon.\nPopulation: 23.\n\n"May the Old Gods light your path."' },
+    { x:21, y:32, text:'THE CURSED MINES\n\n"Turn back. Whatever you hear below,\ndo not answer it."\n\n— scratched into the stone by a shaking hand', type:'stairs' },
 ];
 
 const DUNGEON_NPCS = [
@@ -109,12 +206,12 @@ const DUNGEON_ITEMS = [
 // ═══════════════════════════════════════════════════════
 const MAPS = {
     village: {
-        id:'village', w:30, h:23,
-        tiles: VILLAGE_TILES,
+        id:'village', w:48, h:36,
+        tiles: buildVillageTiles(),
         npcs:  VILLAGE_NPCS,
         signs: VILLAGE_SIGNS,
         items: [],
-        playerStart:{x:7,y:8},
+        playerStart:{x:21,y:16},
         name:'Eldoria Village',
         dark:false,
     },
@@ -258,7 +355,7 @@ function handleStairsDown() {
 }
 
 function handleStairsUp() {
-    changeMap('village', 5, 20);
+    changeMap('village', 22, 32);
 }
 
 function changeMap(mapId, sx, sy) {
