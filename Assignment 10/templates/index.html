@@ -154,15 +154,21 @@
             <span id="hud-name">Hero</span>
             <span class="hud-sep">·</span>
             <span id="hud-class">Warrior</span>
+            <span class="hud-sep">|</span>
+            <span id="hud-location">Eldoria Village</span>
         </div>
         <div id="hud-center">
             <span>WASD / &#8592;&#8593;&#8595;&#8594; Move</span>
             <span class="hud-sep">·</span>
             <span>E Interact</span>
             <span class="hud-sep">·</span>
+            <span>Q Quests</span>
+            <span class="hud-sep">·</span>
             <span>Esc Close</span>
         </div>
         <div id="hud-right">
+            <div id="inv-bar"></div>
+            <button id="quest-btn" class="hud-btn">&#128220; Quests</button>
             <button id="music-toggle" class="hud-btn active">&#127925;</button>
             <button id="restart-btn" class="hud-btn">&#8635; New Game</button>
         </div>
@@ -182,6 +188,20 @@
         </div>
     </div>
 
+    <!-- Quest Log overlay -->
+    <div id="quest-log" class="overlay hidden">
+        <div class="quest-log-inner">
+            <div class="quest-log-header">
+                <span>&#128220; Quest Journal</span>
+                <button id="close-quest-log" class="back-btn">&#10005; Close</button>
+            </div>
+            <div id="quest-list"></div>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notifications"></div>
+
     <!-- NPC Dialogue overlay -->
     <div id="dialogue-box" class="overlay hidden">
         <div class="dlg-inner">
@@ -195,6 +215,9 @@
     </div>
 
 </div>
+
+<!-- Full-screen transition overlay (menu ↔ game) -->
+<div id="transition-overlay"></div>
 
 <script>
 // ── Menu particle background ──────────────────────────
@@ -263,13 +286,28 @@ menuLoop();
 
 // ── Panel navigation ──────────────────────────────────
 function showPanel(id) {
-    document.querySelectorAll('.menu-panel').forEach(p => {
-        p.classList.add('hidden');
-        p.style.opacity = '0';
-    });
-    const el = document.getElementById(id);
-    el.classList.remove('hidden');
-    requestAnimationFrame(() => { el.style.opacity = '1'; });
+    const current = document.querySelector('.menu-panel:not(.hidden)');
+    const next    = document.getElementById(id);
+    if (!current || current === next) {
+        // Initial load — just show immediately
+        document.querySelectorAll('.menu-panel').forEach(p => { p.classList.add('hidden'); p.style.opacity='0'; p.style.transform=''; });
+        next.classList.remove('hidden');
+        requestAnimationFrame(() => { next.style.opacity='1'; next.style.transform='translateY(0)'; });
+        return;
+    }
+    // Fade + slide current panel out
+    current.style.opacity   = '0';
+    current.style.transform = 'translateY(-10px)';
+    setTimeout(() => {
+        document.querySelectorAll('.menu-panel').forEach(p => { p.classList.add('hidden'); p.style.opacity='0'; });
+        // Slide next in from slightly below
+        next.style.transform = 'translateY(12px)';
+        next.classList.remove('hidden');
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            next.style.opacity   = '1';
+            next.style.transform = 'translateY(0)';
+        }));
+    }, 200);
 }
 
 showPanel('menu-main');
@@ -287,6 +325,213 @@ document.querySelectorAll('.class-card').forEach(card => {
         document.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
     });
+});
+
+// ── Transition overlay ────────────────────────────────
+const _ov = document.getElementById('transition-overlay');
+function fadeOverlay(dir, cb) {
+    if (dir === 'in') {
+        _ov.style.transition = 'opacity 0.35s ease';
+        _ov.style.opacity = '1';
+        _ov.style.pointerEvents = 'all';
+        setTimeout(() => { if (cb) cb(); }, 360);
+    } else {
+        _ov.style.transition = 'opacity 0.5s ease';
+        _ov.style.opacity = '0';
+        _ov.style.pointerEvents = 'none';
+        setTimeout(() => { if (cb) cb(); }, 520);
+    }
+}
+
+// ── Menu Audio System ─────────────────────────────────
+let mACtx = null, mAMaster = null, mAMelody = null, mANodes = [];
+
+// A natural minor scale across two octaves (Hz)
+const MENU_SCALE = [
+    55, 61.74, 65.41, 73.42, 82.41, 87.31, 98,
+    110, 123.47, 130.81, 146.83, 164.81, 174.61, 196,
+    220, 246.94, 261.63, 293.66,
+];
+
+function initMenuAudio() {
+    if (mACtx) return;
+    mACtx = new (window.AudioContext || window['webkitAudioContext'])();
+    // Create SFX context here during the same user gesture so it's
+    // already "running" before any click fires
+    if (!sfxCtx || sfxCtx.state === 'closed') {
+        sfxCtx = new (window.AudioContext || window['webkitAudioContext'])();
+    }
+
+    // Wet chain: delay → LPF → feedback → master
+    mAMaster = mACtx.createGain();
+    mAMaster.gain.value = 0.32;
+    mAMaster.connect(mACtx.destination);
+
+    const delay = mACtx.createDelay(4);
+    delay.delayTime.value = 0.65;
+    const fb  = mACtx.createGain();   fb.gain.value  = 0.36;
+    const lpf = mACtx.createBiquadFilter();
+    lpf.type = 'lowpass'; lpf.frequency.value = 1100;
+    delay.connect(lpf); lpf.connect(fb); fb.connect(delay);
+    delay.connect(mAMaster);
+    mANodes.push(delay, fb, lpf);
+
+    // Ambience — pulled back so melody sits above it
+    _mDrone(55,    0.07, 'sine');
+    _mDrone(82.41, 0.04, 'sine');
+    _mDrone(110,   0.02, 'triangle');
+
+    // Wind texture (quieter, background only)
+    _mWind();
+
+    // Dedicated melody gain — runs loud, separate from the wet/dry chain
+    const melGain = mACtx.createGain();
+    melGain.gain.value = 1.0;
+    melGain.connect(mAMaster);
+
+    // Opening chord — immediately audible
+    _mChord([MENU_SCALE[0], MENU_SCALE[4], MENU_SCALE[7]], delay, melGain);
+
+    // Melody: every 2–3 s, loud chorus notes
+    mAMelody = setInterval(() => {
+        if (!mACtx || mACtx.state === 'closed') return;
+        const burst = Math.random() < 0.4 ? 2 : 1;
+        const pool  = MENU_SCALE.slice(4, 14);
+        for (let i = 0; i < burst; i++) {
+            const freq = pool[Math.floor(Math.random() * pool.length)];
+            _mNote(freq, delay, melGain, 0.50, 5.5);
+        }
+    }, 2000 + Math.random() * 1400);
+}
+
+function _mDrone(freq, vol, type) {
+    const o = mACtx.createOscillator(), g = mACtx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = vol;
+    o.connect(g); g.connect(mAMaster); o.start();
+    mANodes.push(o, g);
+}
+
+function _mWind() {
+    const len = mACtx.sampleRate * 3;
+    const buf = mACtx.createBuffer(1, len, mACtx.sampleRate);
+    const d   = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = mACtx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    const flt = mACtx.createBiquadFilter();
+    flt.type = 'bandpass'; flt.frequency.value = 280; flt.Q.value = 0.35;
+    const wg  = mACtx.createGain(); wg.gain.value = 0.032;
+    const lfo = mACtx.createOscillator(), lfog = mACtx.createGain();
+    lfo.frequency.value = 0.055; lfog.gain.value = 0.014;
+    lfo.connect(lfog); lfog.connect(wg.gain);
+    lfo.start(); src.connect(flt); flt.connect(wg); wg.connect(mAMaster); src.start();
+    mANodes.push(src, flt, wg, lfo, lfog);
+}
+
+// Each melody note plays TWO detuned oscillators (chorus) + tremolo LFO
+function _mNote(freq, wet, dry, vol, dur) {
+    const now = mACtx.currentTime;
+
+    // Envelope
+    const env = mACtx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(vol, now + 0.12);
+    env.gain.setValueAtTime(vol, now + dur * 0.45);
+    env.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    // Tremolo (slow volume shimmer ~5Hz)
+    const trem = mACtx.createOscillator(), tremG = mACtx.createGain();
+    trem.frequency.value = 4.8; tremG.gain.value = vol * 0.18;
+    trem.connect(tremG); tremG.connect(env.gain);
+    trem.start(now); trem.stop(now + dur + 0.1);
+
+    // Main oscillator — triangle for warmth
+    const o1 = mACtx.createOscillator();
+    o1.type = 'triangle'; o1.frequency.value = freq;
+    o1.connect(env);
+
+    // Chorus twin — slightly sharp (~6 cents)
+    const o2 = mACtx.createOscillator();
+    o2.type = 'triangle'; o2.frequency.value = freq * 1.0035;
+    const choG = mACtx.createGain(); choG.gain.value = 0.55;
+    o2.connect(choG); choG.connect(env);
+
+    env.connect(wet);   // send to reverb delay
+    env.connect(dry);   // send direct to melody gain
+
+    o1.start(now); o1.stop(now + dur + 0.1);
+    o2.start(now); o2.stop(now + dur + 0.1);
+}
+
+function _mChord(freqs, wet, dry) {
+    freqs.forEach(f => _mNote(f, wet, dry, 0.42, 7));
+}
+
+function stopMenuAudio() {
+    clearInterval(mAMelody); mAMelody = null;
+    mANodes.forEach(n => { try { n.stop ? n.stop() : n.disconnect(); } catch(e) {} });
+    mANodes = [];
+    if (mACtx) { mACtx.close(); mACtx = null; }
+    mAMaster = null;
+}
+
+// SFX run in their own AudioContext (created alongside mACtx on first hover)
+// so the music's compressor never affects their volume
+let sfxCtx = null;
+function _sfx() {
+    // Fallback: if somehow called before initMenuAudio, create on the spot
+    if (!sfxCtx || sfxCtx.state === 'closed') {
+        sfxCtx = new (window.AudioContext || window['webkitAudioContext'])();
+    }
+    return sfxCtx;
+}
+
+// Hover sound — soft rising shimmer
+function playHover() {
+    const ctx = _sfx();
+    const t = ctx.currentTime + 0.005; // small lookahead — never schedule in the past
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(520, t);
+    o.frequency.linearRampToValueAtTime(820, t + 0.07);
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 0.15);
+}
+
+// Click sound — heavy medieval thud + metallic tick
+function playClick() {
+    const ctx = _sfx();
+    const t = ctx.currentTime + 0.005;
+    // Thud
+    const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+    o1.type = 'sine';
+    o1.frequency.setValueAtTime(200, t);
+    o1.frequency.exponentialRampToValueAtTime(55, t + 0.18);
+    g1.gain.setValueAtTime(0.45, t);
+    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    o1.connect(g1); g1.connect(ctx.destination);
+    o1.start(t); o1.stop(t + 0.23);
+    // Tick
+    const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+    o2.type = 'square'; o2.frequency.value = 1400;
+    g2.gain.setValueAtTime(0.06, t);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+    o2.connect(g2); g2.connect(ctx.destination);
+    o2.start(t); o2.stop(t + 0.04);
+}
+
+// Attach to all interactive menu elements
+document.querySelectorAll('.menu-btn, .back-btn, .primary-btn, .class-card').forEach(el => {
+    el.addEventListener('mouseenter', () => { initMenuAudio(); playHover(); });
+    el.addEventListener('click',      () => { initMenuAudio(); playClick(); });
+});
+
+// Stop menu audio and show transition overlay when entering the game
+document.getElementById('begin-btn').addEventListener('click', () => {
+    stopMenuAudio();
+    fadeOverlay('in');
 });
 </script>
 <script src="/static/game.js"></script>

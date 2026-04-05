@@ -9,6 +9,13 @@ html, body {
     font-family: 'IM Fell English', serif;
 }
 
+/* ── Transition overlay ────────────────────────────── */
+#transition-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #060609;
+    opacity: 0; pointer-events: none;
+}
+
 .hidden { display: none !important; }
 
 /* ── Start Screen ──────────────────────────────── */
@@ -31,7 +38,7 @@ html, body {
     position: relative; z-index: 1;
     width: 100%; max-width: 520px;
     padding: 0 20px;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.22s ease, transform 0.22s ease;
 }
 .menu-panel.hidden { display: none; }
 
@@ -369,3 +376,115 @@ html, body {
     transform: translateX(3px);
 }
 .dlg-opt:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── HUD extras ────────────────────────────────────── */
+#hud-location {
+    font-size: 0.75rem; color: #7a6040;
+    letter-spacing: 1px; font-style: italic;
+}
+
+#inv-bar {
+    display: flex; align-items: center; gap: 4px;
+}
+.inv-item {
+    width: 26px; height: 26px; line-height: 26px;
+    text-align: center; font-size: 1rem;
+    background: rgba(200,146,42,0.1);
+    border: 1px solid #5a3a18; border-radius: 3px;
+    cursor: default; transition: border-color 0.2s;
+}
+.inv-item:hover { border-color: #c8922a; }
+
+/* ── Quest Log overlay ─────────────────────────────── */
+#quest-log {
+    top: 50px; right: 16px;
+    width: min(360px, 94vw);
+    max-height: calc(100vh - 120px);
+}
+
+.quest-log-inner {
+    background: rgba(10,6,2,0.97);
+    border: 1px solid #5a3a18; border-radius: 6px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.9);
+    display: flex; flex-direction: column;
+    max-height: calc(100vh - 120px);
+}
+
+.quest-log-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid #3a2010;
+    font-family: 'Cinzel', serif; font-size: 1rem;
+    color: #c8922a; letter-spacing: 2px;
+    flex-shrink: 0;
+}
+
+#quest-list {
+    padding: 12px 18px;
+    overflow-y: auto; flex: 1;
+    display: flex; flex-direction: column; gap: 12px;
+}
+
+.quest-entry {
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid #3a2010; border-radius: 5px;
+}
+.quest-entry.quest-done {
+    border-color: #2a4018; opacity: 0.65;
+}
+
+.quest-title {
+    font-family: 'Cinzel', serif; font-size: 0.88rem;
+    color: #c8922a; letter-spacing: 1px; margin-bottom: 4px;
+}
+.quest-done .quest-title { color: #6a8040; }
+
+.quest-giver {
+    font-size: 0.72rem; color: #6a5030;
+    letter-spacing: 1px; margin-bottom: 6px;
+}
+
+.quest-obj {
+    font-size: 0.84rem; color: #a09070; line-height: 1.5;
+}
+.quest-obj em { color: #6a8040; font-style: italic; }
+
+.quest-empty {
+    font-size: 0.85rem; color: #5a4030;
+    text-align: center; padding: 20px 0;
+    font-style: italic;
+}
+
+/* ── Notifications ─────────────────────────────────── */
+#notifications {
+    position: fixed; top: 56px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 200; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+
+.notif {
+    padding: 9px 20px;
+    border-radius: 4px; font-size: 0.85rem;
+    letter-spacing: 1px; font-family: 'Cinzel', serif;
+    opacity: 0; transform: translateY(-8px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    white-space: nowrap;
+}
+.notif-show { opacity: 1; transform: translateY(0); }
+
+.notif-quest {
+    background: rgba(30,20,5,0.97);
+    border: 1px solid #c8922a; color: #c8922a;
+    box-shadow: 0 0 20px rgba(200,146,42,0.25);
+}
+.notif-item {
+    background: rgba(20,25,10,0.97);
+    border: 1px solid #70a040; color: #a0d060;
+    box-shadow: 0 0 16px rgba(100,160,40,0.2);
+}
+.notif-info {
+    background: rgba(10,15,25,0.97);
+    border: 1px solid #4a6a90; color: #90b8d8;
+}
