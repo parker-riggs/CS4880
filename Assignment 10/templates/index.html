@@ -255,9 +255,14 @@
             <div class="dlg-header">
                 <div id="dlg-portrait">&#128100;</div>
                 <span id="dlg-name">NPC</span>
+                <button class="dlg-close-btn" onclick="closeDialogue()">&#x2715;</button>
             </div>
+            <div id="dlg-player-msg"></div>
             <div id="dlg-text">...</div>
-            <div id="dlg-options"></div>
+            <div class="dlg-input-row">
+                <input type="text" id="dlg-input" placeholder="Say something…" maxlength="240" autocomplete="off">
+                <button id="dlg-send" onclick="sendDialogueMessage()">&#9658;</button>
+            </div>
         </div>
     </div>
 
@@ -265,6 +270,11 @@
 
 <!-- Full-screen transition overlay (menu ↔ game) -->
 <div id="transition-overlay"></div>
+
+<!-- Intro cinematic overlay (shows on new game start) -->
+<div id="intro-overlay" class="hidden">
+    <p id="intro-text"></p>
+</div>
 
 <script>
 // ── Menu particle background ──────────────────────────
@@ -628,7 +638,19 @@ function playClick() {
     o2.start(t); o2.stop(t + 0.04);
 }
 
-// Attach to all interactive menu elements
+// Start music on the very first user gesture anywhere on the page
+// (browsers block AudioContext until interaction, but this fires on first click/touch/key)
+function _bootAudio() {
+    initMenuAudio();
+    document.removeEventListener('pointerdown', _bootAudio);
+    document.removeEventListener('touchstart',  _bootAudio);
+    document.removeEventListener('keydown',     _bootAudio);
+}
+document.addEventListener('pointerdown', _bootAudio);
+document.addEventListener('touchstart',  _bootAudio, { passive: true });
+document.addEventListener('keydown',     _bootAudio);
+
+// Attach hover/click SFX to all interactive menu elements
 document.querySelectorAll('.menu-btn, .back-btn, .primary-btn, .class-card').forEach(el => {
     el.addEventListener('mouseenter', () => { initMenuAudio(); playHover(); });
     el.addEventListener('click',      () => { initMenuAudio(); playClick(); });

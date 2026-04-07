@@ -10,7 +10,7 @@ const TILE = Object.freeze({
 });
 const WALKABLE = new Set([
     TILE.GRASS, TILE.PATH, TILE.FLOOR,
-    TILE.DOOR, TILE.SIGN, TILE.STAIRS, TILE.STAIRSUP,
+    TILE.DOOR, TILE.STAIRS, TILE.STAIRSUP,
 ]);
 const { GRASS:G, PATH:P, FLOOR:F, WALL:W, TREE:TR,
         WATER:WA, DOOR:DR, STAIRS:ST, SIGN:SG,
@@ -293,7 +293,12 @@ function buildVeylaInterior() {
 // ═══════════════════════════════════════════════════════
 //  WORLD ENTITY DATA
 // ═══════════════════════════════════════════════════════
-const VILLAGE_NPCS = [];  // NPCs are now inside their respective buildings
+const GUIDE_NPCS = [
+    { id:'guide', name:'Rowan', x:21, y:15, portrait:'🧑', color:'#80c870', history:[],
+      role:'A friendly young villager who greets newcomers and introduces them to Eldoria.' },
+];
+
+const VILLAGE_NPCS = [];  // Major NPCs are inside buildings; Rowan stays in the village square
 
 const ELDER_NPCS = [
     { id:'elder', name:'Elder Maren', x:6, y:5, portrait:'👴', color:'#d0c870', history:[],
@@ -330,6 +335,7 @@ const DUNGEON_SIGNS = [
 const DUNGEON_ITEMS = [
     { id:'henrick_ring', name:"Henrick's Ring", x:25, y:13, color:'#e8c050', icon:'💍',
       desc:"A worn iron ring with 'H.D.' engraved on the inside. This belonged to Daran's brother.",
+      questRequired:'quest_brothers_fate_given',
       questComplete:'quest_brothers_fate_complete' },
 ];
 
@@ -340,7 +346,7 @@ const MAPS = {
     village: {
         id:'village', w:48, h:36,
         tiles: buildVillageTiles(),
-        npcs:  VILLAGE_NPCS,
+        npcs:  [...VILLAGE_NPCS, ...GUIDE_NPCS],
         signs: VILLAGE_SIGNS,
         items: [],
         playerStart:{x:21,y:16},
@@ -468,7 +474,11 @@ const BUILDING_ENTRANCES = {
 //  QUEST DEFINITIONS
 // ═══════════════════════════════════════════════════════
 const QUESTS = [
-    { id:'into_the_dark',    title:'Into the Dark',
+    { id:'find_weapon',     title:'Armed and Ready',
+      giver:'guide',        giverName:'Rowan',
+      objective:'Find your weapon hidden somewhere in the village.',
+      flag_given:'quest_weapon_given', flag_complete:'quest_weapon_complete' },
+    { id:'into_the_dark',   title:'Into the Dark',
       giver:'elder',        giverName:'Elder Maren',
       objective:'Descend into the Cursed Mines south of Eldoria.',
       flag_given:'quest_into_dark_given', flag_complete:'quest_into_dark_complete' },
@@ -483,6 +493,7 @@ const QUESTS = [
 ];
 
 const QUEST_GIVER_FLAGS = {
+    guide:       'quest_weapon_given',
     elder:       'quest_into_dark_given',
     blacksmith:  'quest_brothers_fate_given',
     traveler:    'quest_sealed_truth_given',
@@ -494,7 +505,14 @@ const QUEST_GIVER_FLAGS = {
 const gs = { charName:'Hero', charClass:'Warrior', flags:{}, inventory:[] };
 let currentMap = MAPS.village;
 
-const player  = { x:7, y:8, facing:'down' };
+const player  = {
+    x:7, y:8, facing:'down',
+    renderX:7*48, renderY:8*48,   // sub-tile pixel position for smooth rendering
+    prevX:7*48,   prevY:8*48,     // start of current move interpolation
+    moveT:1, moveDuration:130,    // move progress (0→1) and duration in ms
+    walkPhase:0,                  // advances each step; drives leg/bob animation
+    isMoving:false,
+};
 const cam     = { x:0, y:0 };
 const ui      = { dialogue:null, sign:null, loading:false, questLog:false, paused:false };
 let timeMs    = 0;
@@ -538,6 +556,9 @@ document.addEventListener('keydown', e => {
     }
 });
 document.addEventListener('keyup', e => KEYS.delete(e.key));
+document.addEventListener('keydown', e => {
+    if(e.target?.id==='dlg-input'&&e.key==='Enter'){e.preventDefault();sendDialogueMessage();}
+});
 
 let moveAccum = 999;
 
@@ -572,7 +593,13 @@ function tryMove(dx, dy, facing) {
     if (!NPCS_OK(nx, ny)) return false;
     const tile = currentMap.tiles[ny][nx];
     if (!WALKABLE.has(tile)) return false;
+    // Start smooth interpolation from current render position to new tile
+    player.prevX = player.renderX; player.prevY = player.renderY;
     player.x = nx; player.y = ny;
+    player.moveT = 0; player.isMoving = true;
+    player.walkPhase += Math.PI; // half-cycle per step drives alternating legs
+    // Footstep dust puff at the tile we just left
+    spawnParticle('dust', player.prevX/TS + 0.5, player.prevY/TS + 0.5);
     // Building entry via door tiles
     if (tile === TILE.DOOR) {
         const key = `${nx},${ny}`;
@@ -615,6 +642,9 @@ function changeMap(mapId, sx, sy) {
     player.x   = sx !== undefined ? sx : currentMap.playerStart.x;
     player.y   = sy !== undefined ? sy : currentMap.playerStart.y;
     player.facing = 'down';
+    player.renderX = player.x * TS; player.renderY = player.y * TS;
+    player.prevX = player.renderX;  player.prevY = player.renderY;
+    player.moveT = 1; player.isMoving = false;
     updateCamera();
 
     document.getElementById('hud-location').textContent = currentMap.name;
@@ -630,9 +660,23 @@ function changeMap(mapId, sx, sy) {
 // ═══════════════════════════════════════════════════════
 //  CAMERA
 // ═══════════════════════════════════════════════════════
+function updatePlayerAnim(dt) {
+    if (player.moveT >= 1) {
+        player.renderX = player.x * TS;
+        player.renderY = player.y * TS;
+        player.isMoving = false;
+        return;
+    }
+    player.moveT = Math.min(1, player.moveT + dt / player.moveDuration);
+    const t = player.moveT;
+    const ease = t * t * (3 - 2 * t); // smoothstep
+    player.renderX = player.prevX + (player.x * TS - player.prevX) * ease;
+    player.renderY = player.prevY + (player.y * TS - player.prevY) * ease;
+}
+
 function updateCamera() {
-    const tx = player.x * TS + TS/2 - canvas.width/2;
-    const ty = player.y * TS + TS/2 - canvas.height/2;
+    const tx = player.renderX + TS/2 - canvas.width/2;
+    const ty = player.renderY + TS/2 - canvas.height/2;
     cam.x = Math.round(Math.max(0, Math.min(tx, currentMap.w * TS - canvas.width)));
     cam.y = Math.round(Math.max(0, Math.min(ty, currentMap.h * TS - canvas.height)));
 }
@@ -975,18 +1019,22 @@ function drawTile(tile, px, py, tx, ty) {
         case TILE.STAIRS:   drawStairs(px,py);   break;
         case TILE.STAIRSUP: drawStairsUp(px,py); break;
         case TILE.SIGN: {
-            if (dark) {
-                ctx.drawImage(_tc[`fd${(tx*5+ty*17)&3}`], ipx, ipy, S1, S1);
+            const snb = [
+                currentMap.tiles[ty]?.[tx-1], currentMap.tiles[ty]?.[tx+1],
+                currentMap.tiles[ty-1]?.[tx],  currentMap.tiles[ty+1]?.[tx],
+            ];
+            const onWall = snb.some(t=>t===TILE.WALL);
+            if (dark || onWall) {
+                ctx.drawImage(_tc[dark?`fd${(tx*5+ty*17)&3}`:`wl${(tx*3+ty*11)&3}`], ipx, ipy, S1, S1);
+            } else if (snb.some(t=>t===TILE.FLOOR)) {
+                ctx.drawImage(_tc[`fl${(tx*5+ty*17)&3}`], ipx, ipy, S1, S1);
+            } else if (snb.some(t=>t===TILE.PATH)) {
+                ctx.drawImage(_tc[`p${(tx*11+ty*7)&3}`],  ipx, ipy, S1, S1);
             } else {
-                const nb = [
-                    currentMap.tiles[ty]?.[tx-1], currentMap.tiles[ty]?.[tx+1],
-                    currentMap.tiles[ty-1]?.[tx],  currentMap.tiles[ty+1]?.[tx],
-                ];
-                if      (nb.some(t=>t===TILE.FLOOR)) ctx.drawImage(_tc[`fl${(tx*5+ty*17)&3}`], ipx, ipy, S1, S1);
-                else if (nb.some(t=>t===TILE.PATH))  ctx.drawImage(_tc[`p${(tx*11+ty*7)&3}`],  ipx, ipy, S1, S1);
-                else                                  ctx.drawImage(_tc[`g${(tx*7+ty*13)&7}`],  ipx, ipy, S1, S1);
+                ctx.drawImage(_tc[`g${(tx*7+ty*13)&7}`],  ipx, ipy, S1, S1);
             }
-            drawSignPost(px,py);
+            if (onWall) drawWallPlaque(px, py);
+            else        drawSignPost(px,py);
             break;
         }
         case TILE.TORCH:    drawTorch(px,py);    break;
@@ -1169,32 +1217,90 @@ function drawWater(px, py) {
 
 function drawDoor(px, py) {
     const dark = currentMap.dark;
-    drawWall(px, py, dark);
-    // 3 flat wood planks
-    const plankH = Math.floor(TS*.88/3);
-    const plankC = ['#7a4018','#8a4c20','#6a3410'];
-    for (let i = 0; i < 3; i++) {
-        const plankY = Math.floor(py+TS*.07+i*plankH);
-        ctx.fillStyle = plankC[i];
-        ctx.fillRect(Math.floor(px+TS*.15), plankY, Math.floor(TS*.70), plankH-1);
-        // top highlight per plank
-        ctx.fillStyle = 'rgba(255,255,255,0.09)';
-        ctx.fillRect(Math.floor(px+TS*.15), plankY, Math.floor(TS*.70), 1);
-        // 3 grain lines per plank
-        ctx.fillStyle = 'rgba(0,0,0,0.12)';
-        for (let g = 0; g < 3; g++) {
-            ctx.fillRect(Math.floor(px+TS*.19+g*(TS*.20)), plankY+2, 1, plankH-4);
-        }
+    const T = TS;
+    const ipx = Math.floor(px), ipy = Math.floor(py);
+
+    // ── 1. Wall background (full tile) ──────────────────
+    drawWall(ipx, ipy, dark);
+
+    // ── 2. Stone door frame (recessed arch) ─────────────
+    const frameL = Math.floor(T*.13), frameR = Math.floor(T*.87);
+    const frameW  = frameR - frameL;
+    const frameTop = Math.floor(T*.05), frameBot = Math.floor(T*.86);
+    const frameH  = frameBot - frameTop;
+    const frameCol = dark ? '#0e0b16' : '#3a2a18';
+    ctx.fillStyle = frameCol;
+    ctx.fillRect(ipx+frameL-2, ipy+frameTop, frameW+4, frameH); // recess shadow
+
+    // Arch top — 3 flat rect approximation
+    const archH = Math.floor(T*.10);
+    ctx.fillStyle = dark ? '#16121e' : '#4a3828';
+    ctx.fillRect(ipx+frameL, ipy+frameTop, frameW, archH);
+    ctx.fillStyle = dark ? '#1c1828' : '#5a4838';
+    ctx.fillRect(ipx+frameL+2, ipy+frameTop+1, frameW-4, archH-2);
+
+    // ── 3. Door panel (wood planks) ───────────────────────
+    const dL = ipx+frameL+2, dTop = ipy+frameTop+archH;
+    const dW = frameW-4,    dH  = frameBot - frameTop - archH - 2;
+    const plankH = Math.floor(dH/4);
+    const plankCols = dark
+        ? ['#2a1808','#321e0c','#241408','#2e1c0a']
+        : ['#7a4018','#8a4c20','#6a3410','#7c4820'];
+    for (let i = 0; i < 4; i++) {
+        const plankY = dTop + i*plankH;
+        const ph = i === 3 ? dH - 3*plankH : plankH;
+        ctx.fillStyle = plankCols[i];
+        ctx.fillRect(dL, plankY, dW, ph - 1);
+        // Highlight top edge
+        ctx.fillStyle = 'rgba(255,255,255,0.10)';
+        ctx.fillRect(dL, plankY, dW, 1);
+        // Vertical grain lines
+        ctx.fillStyle = 'rgba(0,0,0,0.10)';
+        ctx.fillRect(dL+Math.floor(dW*.33), plankY+1, 1, ph-2);
+        ctx.fillRect(dL+Math.floor(dW*.66), plankY+1, 1, ph-2);
     }
-    // Hinges: 2 dark gray rects
-    ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(Math.floor(px+TS*.13), Math.floor(py+TS*.18), Math.floor(TS*.10), Math.floor(TS*.10));
-    ctx.fillRect(Math.floor(px+TS*.13), Math.floor(py+TS*.62), Math.floor(TS*.10), Math.floor(TS*.10));
-    // Knob: 2 stacked rects
-    ctx.fillStyle = '#505050';
-    ctx.fillRect(Math.floor(px+TS*.74), Math.floor(py+TS*.42), Math.floor(TS*.06), Math.floor(TS*.08));
-    ctx.fillStyle = '#707070';
-    ctx.fillRect(Math.floor(px+TS*.75), Math.floor(py+TS*.45), Math.floor(TS*.04), Math.floor(TS*.04));
+    // Panel inset shadow on sides
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillRect(dL, dTop, 2, dH);
+    ctx.fillRect(dL+dW-2, dTop, 2, dH);
+
+    // ── 4. Door handle (brass) ────────────────────────────
+    const hx = ipx + Math.floor(T*.70), hy = ipy + Math.floor(T*.50);
+    ctx.fillStyle = '#c8901a';
+    ctx.fillRect(hx, hy, Math.floor(T*.06), Math.floor(T*.10));
+    ctx.fillStyle = '#e8b030';
+    ctx.fillRect(hx+1, hy+1, Math.floor(T*.03), Math.floor(T*.04));
+
+    // ── 5. Hinges (iron) ─────────────────────────────────
+    const hingeX = ipx+frameL+2, hingeW = Math.floor(T*.07), hingeH = Math.floor(T*.06);
+    ctx.fillStyle = '#282828';
+    ctx.fillRect(hingeX, ipy+Math.floor(T*.20), hingeW, hingeH);
+    ctx.fillRect(hingeX, ipy+Math.floor(T*.62), hingeW, hingeH);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(hingeX, ipy+Math.floor(T*.20), hingeW, 1);
+    ctx.fillRect(hingeX, ipy+Math.floor(T*.62), hingeW, 1);
+
+    // ── 6. Stone step (threshold) at bottom ──────────────
+    const stepH = Math.floor(T*.14);
+    ctx.fillStyle = dark ? '#1e1830' : '#8a7a60';
+    ctx.fillRect(ipx+frameL-3, ipy+frameBot, frameW+6, stepH);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(ipx+frameL-3, ipy+frameBot, frameW+6, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(ipx+frameL-3, ipy+frameBot+stepH-1, frameW+6, 1);
+
+    // ── 7. Small transom window above door ────────────────
+    const winY = ipy+frameTop+2, winH = archH-4;
+    const winL = dL+Math.floor(dW*.20), winW = Math.floor(dW*.60);
+    if (winH > 2) {
+        ctx.fillStyle = dark ? '#0a0818' : '#4a6a8a'; // glass
+        ctx.fillRect(winL, winY, winW, winH);
+        ctx.fillStyle = 'rgba(255,255,255,0.20)';
+        ctx.fillRect(winL, winY, winW, 1);
+        ctx.fillRect(winL, winY, 1, winH);
+        ctx.fillStyle = dark ? '#1a1430' : '#6a8aaa';
+        ctx.fillRect(winL+Math.floor(winW/2)-1, winY, 1, winH); // center bar
+    }
 }
 
 function drawStairs(px, py) {
@@ -1244,6 +1350,38 @@ function drawStairsUp(px, py) {
     ctx.fillStyle=`rgba(100,230,130,${0.65+0.18*Math.sin(t*3)})`;
     ctx.font=`bold ${TS*.3}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText('↑',px+TS/2,py+TS*.54+Math.sin(t*2.5)*2);
+}
+
+function drawWallPlaque(px, py) {
+    const U = Math.max(1, Math.floor(TS/16));
+    // Stone bracket mounts (left + right)
+    ctx.fillStyle = '#3a2c1c';
+    ctx.fillRect(Math.floor(px+TS*.10), Math.floor(py+TS*.30), U*2, U*3);
+    ctx.fillRect(Math.floor(px+TS*.82), Math.floor(py+TS*.30), U*2, U*3);
+    // Plaque board: dark border
+    const bx = Math.floor(px+TS*.12), by = Math.floor(py+TS*.22);
+    const bw = Math.floor(TS*.76),    bh = Math.floor(TS*.44);
+    ctx.fillStyle = '#2a1a08'; ctx.fillRect(bx, by, bw, bh);
+    // Mid fill
+    ctx.fillStyle = '#a06828'; ctx.fillRect(bx+2, by+2, bw-4, bh-4);
+    // Top half highlight
+    ctx.fillStyle = '#c08038'; ctx.fillRect(bx+2, by+2, bw-4, Math.floor((bh-4)/2));
+    // 3 carved text lines
+    const lm = bx+Math.floor(bw*.14), lw = Math.floor(bw*.72);
+    ctx.fillStyle = 'rgba(40,15,5,0.72)';
+    ctx.fillRect(lm, Math.floor(by+bh*.24), lw,                 2);
+    ctx.fillRect(lm, Math.floor(by+bh*.50), lw,                 2);
+    ctx.fillRect(lm, Math.floor(by+bh*.72), Math.floor(lw*.55), 2);
+    // Bottom shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.20)'; ctx.fillRect(bx+2, by+bh-4, bw-4, 2);
+    // Corner nail dots
+    ctx.fillStyle = '#1a1008';
+    [[bx+Math.floor(bw*.10), by+Math.floor(bh*.15)],
+     [bx+Math.floor(bw*.90), by+Math.floor(bh*.15)],
+     [bx+Math.floor(bw*.10), by+Math.floor(bh*.82)],
+     [bx+Math.floor(bw*.90), by+Math.floor(bh*.82)]].forEach(([nx,ny]) => {
+        ctx.fillRect(Math.floor(nx)-U, Math.floor(ny)-U, U*2, U*2);
+    });
 }
 
 function drawSignPost(px, py) {
@@ -1430,14 +1568,45 @@ function renderVignette() {
 const CLASS_COLORS = {Warrior:'#c8922a',Rogue:'#9a40d0',Wizard:'#3a8ad0',Cleric:'#d0c840'};
 const CLASS_CLOAK  = {Warrior:'#6a2808',Rogue:'#2a0e3a',Wizard:'#101e3a',Cleric:'#5a4808'};
 
-function drawCharacter(sx, sy, color, facing, name, isPlayer, isNear, ghost) {
+function drawCharacter(sx, sy, color, facing, name, isPlayer, isNear, ghost, walkPhase=0, isMoving=false) {
     const cx=sx+TS/2, cy=sy+TS/2, r=TS*.28, t=timeMs/1000;
-    const bob=isPlayer?0:Math.sin(t*1.6+cx*.02)*1.5;
-    ctx.save(); ctx.translate(0,bob);
+
+    // ── Walk bob: player bounces on each step; NPCs idle-sway ──
+    const walkBob = isMoving ? Math.abs(Math.sin(walkPhase)) * TS * 0.055 : 0;
+    const idlePhase = t * 1.1 + cx * 0.031;
+    const npcBob = isPlayer ? 0 : Math.sin(idlePhase) * 1.4;
+    const totalBob = isPlayer ? -walkBob : npcBob;
+
+    ctx.save(); ctx.translate(0, totalBob);
     if (ghost) { ctx.globalAlpha=0.55+0.15*Math.sin(t*2.2); ctx.shadowColor='#80b0ff'; ctx.shadowBlur=18; }
-    // shadow
+
+    // ── Feet / legs (drawn under body) ──────────────────
+    {
+        const dirs = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+        const [fdx,fdy] = dirs[facing] || [0,1];
+        const [fpx,fpy] = [-fdy, fdx]; // perpendicular to facing
+        const footR = r * 0.22;
+        const footPhase = isPlayer ? walkPhase : idlePhase * 0.6;
+        const footSwing = isPlayer ? (isMoving ? r * 0.38 : r * 0.08) : r * 0.13;
+        const footColor = ghost ? '#8090c0' : '#2a1a0a';
+        // foot base position (bottom-center of body)
+        const fbx = cx - fdx * r * 0.15;
+        const fby = cy - fdy * r * 0.15;
+        ctx.fillStyle = footColor;
+        // left foot
+        const lx = fbx + fpx * Math.sin(footPhase) * footSwing;
+        const ly = fby + fpy * Math.sin(footPhase) * footSwing;
+        ctx.beginPath(); ctx.arc(lx, ly, footR, 0, Math.PI*2); ctx.fill();
+        // right foot (opposite phase)
+        const rx2 = fbx + fpx * Math.sin(footPhase + Math.PI) * footSwing;
+        const ry2 = fby + fpy * Math.sin(footPhase + Math.PI) * footSwing;
+        ctx.beginPath(); ctx.arc(rx2, ry2, footR, 0, Math.PI*2); ctx.fill();
+    }
+
+    // ── Ground shadow (squishes up slightly during bob upstroke) ─
+    const shadowScale = 1 - (walkBob / (TS * 0.12)) * 0.25;
     ctx.fillStyle='rgba(0,0,0,0.28)';
-    ctx.beginPath(); ctx.ellipse(cx,cy+r+3,r*.7,r*.22,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx,cy+r+3,r*.7*shadowScale,r*.22*shadowScale,0,0,Math.PI*2); ctx.fill();
     // cloak (slightly larger circle behind body)
     const cloakC=ghost?'rgba(80,110,200,0.7)':isPlayer?(CLASS_CLOAK[gs.charClass]||'#4a2810'):'rgba(20,12,8,0.65)';
     ctx.shadowBlur=0;
@@ -1471,8 +1640,9 @@ function drawCharacter(sx, sy, color, facing, name, isPlayer, isNear, ghost) {
     (eyePos[facing]||eyePos.down).forEach(e => {
         ctx.beginPath(); ctx.arc(hx+e.x*r,hy+e.y*r,r*.10,0,Math.PI*2); ctx.fill();
     });
-    // class weapon (player only)
-    if (isPlayer&&!ghost) drawWeapon(cx,cy,r,facing);
+    // class weapon (player only — only shown after the starter weapon is picked up)
+    const hasWeapon = gs.inventory.some(i => i.questComplete === 'quest_weapon_complete');
+    if (isPlayer&&!ghost&&hasWeapon) drawWeapon(cx,cy,r,facing);
     ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
     // name tag (NPCs only)
     if (!isPlayer) {
@@ -1643,6 +1813,7 @@ function render() {
             drawTile(currentMap.tiles[ty][tx],tx*TS-cam.x,ty*TS-cam.y,tx,ty);
 
     for (const item of currentMap.items) {
+        if (!itemVisible(item)) continue;
         const sx=item.x*TS-cam.x, sy=item.y*TS-cam.y;
         if (sx>-TS&&sx<canvas.width+TS&&sy>-TS&&sy<canvas.height+TS) drawItem(item,sx,sy);
     }
@@ -1651,9 +1822,9 @@ function render() {
         if (sx>-TS*2&&sx<canvas.width+TS&&sy>-TS*2&&sy<canvas.height+TS)
             drawCharacter(sx,sy,npc.color,'down',npc.name,false,isAdjacent(npc.x,npc.y),npc.ghost);
     }
-    drawCharacter(player.x*TS-cam.x, player.y*TS-cam.y,
+    drawCharacter(player.renderX-cam.x, player.renderY-cam.y,
         CLASS_COLORS[gs.charClass]||CLASS_COLORS.Warrior,
-        player.facing,'',true,false,false);
+        player.facing,'',true,false,false,player.walkPhase,player.isMoving);
 
     renderParticles();  // ambient particles (fireflies, dust, sparks, leaves)
     renderLighting();   // dynamic darkness + torch light + warm color bleed
@@ -1725,9 +1896,14 @@ function showSign(text, questComplete) {
 function closeSign(){ui.sign=false;document.getElementById('sign-box').classList.add('hidden');}
 
 // ─ Items ───────────────────────────────────────────────
+function itemVisible(item) {
+    return !item.questRequired || !!gs.flags[item.questRequired];
+}
+
 function checkItemPickup() {
     const items=currentMap.items;
     for(let i=items.length-1;i>=0;i--){
+        if(!itemVisible(items[i])) continue;
         if(items[i].x===player.x&&items[i].y===player.y){
             const item=items.splice(i,1)[0];
             gs.inventory.push(item);
@@ -1750,44 +1926,32 @@ async function startDialogue(npc) {
     document.getElementById('dlg-name').textContent=npc.name;
     document.getElementById('dlg-portrait').textContent=npc.portrait;
     document.getElementById('dlg-text').textContent='…';
-    document.getElementById('dlg-options').innerHTML='';
+    document.getElementById('dlg-player-msg').textContent='';
+    _dlgSetInputEnabled(false);
     box.classList.remove('hidden');
     const data=await callInteract(npc,'',npc.history);
     npc.history=data.history;
-    ui.dialogue=npc;ui.loading=false;
-    showDialogueData(data,npc);
+    ui.dialogue=npc; ui.loading=false;
+    showDialogueData(data);
+    _dlgFocus();
 }
 
-async function chooseOption(npc,optText) {
-    if(ui.loading)return;
+async function sendDialogueMessage() {
+    if(ui.loading||!ui.dialogue)return;
+    const input=document.getElementById('dlg-input');
+    const text=input.value.trim();
+    if(!text)return;
+    input.value='';
+    const npc=ui.dialogue;
     ui.loading=true;
+    document.getElementById('dlg-player-msg').textContent=`You: "${text}"`;
     document.getElementById('dlg-text').textContent='…';
-    document.getElementById('dlg-options').innerHTML='';
-    const data=await callInteract(npc,optText,npc.history);
-    npc.history=data.history;ui.loading=false;
-    if(data.ended){closeDialogue();return;}
-    showDialogueData(data,npc);
-}
-
-async function callInteract(npc,choice,history) {
-    const res=await fetch('/interact',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({npc:{name:npc.name,role:npc.role},choice,history,flags:gs.flags})});
-    return res.json();
-}
-
-function showDialogueData(data,npc) {
-    document.getElementById('dlg-text').textContent=data.dialogue;
-    const op=document.getElementById('dlg-options');op.innerHTML='';
-    for(const opt of data.options){
-        const btn=document.createElement('button');
-        btn.className='dlg-opt';btn.textContent=opt;
-        btn.onclick=()=>chooseOption(npc,opt);op.appendChild(btn);
-    }
-}
-
-function closeDialogue() {
-    if(ui.dialogue){
-        const npc=ui.dialogue;
+    _dlgSetInputEnabled(false);
+    const data=await callInteract(npc,text,npc.history);
+    npc.history=data.history;
+    ui.loading=false;
+    // Grant quest only when LLM explicitly signals it
+    if(data.quest_given){
         const flag=QUEST_GIVER_FLAGS[npc.id];
         if(flag&&!gs.flags[flag]){
             gs.flags[flag]=true;
@@ -1796,8 +1960,40 @@ function closeDialogue() {
             updateQuestUI();
         }
     }
-    ui.dialogue=null;ui.loading=false;
+    if(data.ended){closeDialogue();return;}
+    showDialogueData(data);
+    _dlgFocus();
+}
+
+async function callInteract(npc,playerText,history) {
+    const res=await fetch('/interact',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({npc:{name:npc.name,role:npc.role,id:npc.id},playerText,history,flags:gs.flags})});
+    return res.json();
+}
+
+function showDialogueData(data) {
+    document.getElementById('dlg-text').textContent=data.dialogue;
+    _dlgSetInputEnabled(true);
+}
+
+function _dlgSetInputEnabled(on) {
+    const inp=document.getElementById('dlg-input');
+    const btn=document.getElementById('dlg-send');
+    if(inp) inp.disabled=!on;
+    if(btn) btn.disabled=!on;
+}
+
+function _dlgFocus() {
+    setTimeout(()=>document.getElementById('dlg-input')?.focus(),50);
+}
+
+function closeDialogue() {
+    // Quest is granted via LLM signal, NOT automatically on close
+    ui.dialogue=null; ui.loading=false;
     document.getElementById('dialogue-box').classList.add('hidden');
+    document.getElementById('dlg-player-msg').textContent='';
+    const inp=document.getElementById('dlg-input');
+    if(inp){inp.value='';inp.disabled=false;}
 }
 
 // ─ Quest Log ───────────────────────────────────────────
@@ -1969,19 +2165,94 @@ document.getElementById('pause-mainmenu').addEventListener('click', () => {
 let lastTs=0;
 function loop(ts){
     const dt=Math.min(ts-lastTs,100);lastTs=ts;timeMs=ts;
-    updateMovement(dt);updateCamera();updateParticles(dt);render();
+    updateMovement(dt);updatePlayerAnim(dt);updateCamera();updateParticles(dt);render();
     requestAnimationFrame(loop);
 }
 
 // ═══════════════════════════════════════════════════════
 //  INITIALIZATION
 // ═══════════════════════════════════════════════════════
+// ── Starter weapon placement ────────────────────────────
+const STARTER_WEAPONS = {
+    Warrior: { name:'Iron Sword',    icon:'⚔️',  color:'#b0b8e8', desc:'A well-worn iron sword. Still sharp.' },
+    Rogue:   { name:'Shadow Dagger', icon:'🗡️',  color:'#80c0d8', desc:'Light, quick, and quiet.'             },
+    Wizard:  { name:'Arcane Staff',  icon:'🪄',  color:'#c090e8', desc:'Hums faintly with old magic.'         },
+    Cleric:  { name:'Holy Mace',     icon:'🔱',  color:'#e8c060', desc:'Blessed by the Old Gods.'             },
+};
+
+function placeStarterWeapon(charClass) {
+    const weapon = { ...STARTER_WEAPONS[charClass] || STARTER_WEAPONS.Warrior,
+                     questRequired:'quest_weapon_given',
+                     questComplete:'quest_weapon_complete' };
+    const sx = currentMap.playerStart.x, sy = currentMap.playerStart.y;
+    const walkable = new Set([TILE.GRASS, TILE.PATH]);
+    // Try random positions in a ring of radius 4–10 around start
+    for (let attempt = 0; attempt < 60; attempt++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = 4 + Math.floor(Math.random() * 7);
+        const tx = Math.round(sx + Math.cos(angle) * dist);
+        const ty = Math.round(sy + Math.sin(angle) * dist);
+        if (tx<1||ty<1||tx>=currentMap.w-1||ty>=currentMap.h-1) continue;
+        const tile = currentMap.tiles[ty]?.[tx];
+        if (!walkable.has(tile)) continue;
+        if (currentMap.npcs.some(n=>n.x===tx&&n.y===ty)) continue;
+        if (currentMap.items.some(i=>i.x===tx&&i.y===ty)) continue;
+        currentMap.items.push({ ...weapon, x:tx, y:ty });
+        return;
+    }
+    // Fallback: place south of player on path
+    currentMap.items.push({ ...weapon, x:sx, y:sy+5 });
+}
+
+// ── Intro cinematic sequence ────────────────────────────
+function playIntroSequence() {
+    const ov = document.getElementById('intro-overlay');
+    const lines = [
+        'You open your eyes…',
+        'Eldoria.\nA village clinging to the edge of darkness.',
+        'Someone is calling your name.',
+    ];
+    let i = 0;
+    const txt = document.getElementById('intro-text');
+    ov.style.opacity = '1';
+    ov.classList.remove('hidden');
+
+    function showLine() {
+        if (i >= lines.length) {
+            // Fade out intro overlay → game becomes fully visible
+            ov.style.transition = 'opacity 1.2s ease';
+            ov.style.opacity = '0';
+            setTimeout(() => { ov.classList.add('hidden'); }, 1250);
+            return;
+        }
+        txt.style.opacity = '0';
+        txt.textContent = lines[i];
+        // Small pause then fade in text
+        setTimeout(() => {
+            txt.style.transition = 'opacity 0.7s ease';
+            txt.style.opacity = '1';
+        }, 100);
+        // Hold then fade out
+        setTimeout(() => {
+            txt.style.transition = 'opacity 0.5s ease';
+            txt.style.opacity = '0';
+        }, 1900);
+        setTimeout(() => { i++; showLine(); }, 2500);
+    }
+    showLine();
+}
+
 function startGame(name,charClass) {
     gs.charName=name;gs.charClass=charClass;gs.flags={};gs.inventory=[];
     currentMap=MAPS.village;
-    [...VILLAGE_NPCS,...DUNGEON_NPCS,...ELDER_NPCS,...BLACKSMITH_NPCS,...VEYLA_NPCS].forEach(n=>n.history=[]);
+    [...VILLAGE_NPCS,...GUIDE_NPCS,...DUNGEON_NPCS,...ELDER_NPCS,...BLACKSMITH_NPCS,...VEYLA_NPCS].forEach(n=>n.history=[]);
+    MAPS.village.items=[];
     MAPS.dungeon_1.items=[...DUNGEON_ITEMS.map(i=>({...i}))];
-    player.x=currentMap.playerStart.x;player.y=currentMap.playerStart.y;player.facing='down';
+    placeStarterWeapon(charClass);
+    player.x=currentMap.playerStart.x; player.y=currentMap.playerStart.y; player.facing='down';
+    player.renderX=player.x*TS; player.renderY=player.y*TS;
+    player.prevX=player.renderX; player.prevY=player.renderY;
+    player.moveT=1; player.isMoving=false; player.walkPhase=0;
     ui.dialogue=null;ui.sign=null;ui.questLog=false;ui.loading=false;ui.paused=false;
     _pauseEl().classList.add('hidden');
     resizeCanvas();
@@ -1993,8 +2264,9 @@ function startGame(name,charClass) {
     updateQuestUI();updateInventoryUI();
     startMusic();
     requestAnimationFrame(loop);
-    // Fade overlay out now that the game is ready
+    // Black intro sequence — fades out after the cinematic lines
     if (typeof fadeOverlay === 'function') fadeOverlay('out');
+    playIntroSequence();
 }
 
 document.getElementById('begin-btn').addEventListener('click',()=>{

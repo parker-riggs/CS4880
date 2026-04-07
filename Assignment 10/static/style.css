@@ -16,6 +16,26 @@ html, body {
     opacity: 0; pointer-events: none;
 }
 
+#intro-overlay {
+    position: fixed; inset: 0; z-index: 9990;
+    background: #000;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    transition: opacity 1.2s ease;
+}
+#intro-text {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+    color: #c8a870;
+    text-align: center;
+    letter-spacing: 0.05em;
+    line-height: 1.7;
+    white-space: pre-line;
+    opacity: 0;
+    text-shadow: 0 0 30px rgba(200,168,112,0.5);
+    max-width: 520px; padding: 0 2rem;
+}
+
 .hidden { display: none !important; }
 
 /* ── Start Screen ──────────────────────────────── */
@@ -417,29 +437,52 @@ html, body {
     color: #c8922a; letter-spacing: 1px;
 }
 
+#dlg-player-msg {
+    font-size: 0.82rem; font-style: italic;
+    color: #8a7050; margin-bottom: 8px;
+    min-height: 1rem;
+}
+
 #dlg-text {
     font-size: 1rem; line-height: 1.75;
     color: #d4b896; margin-bottom: 16px;
-    min-height: 2.5rem;
+    min-height: 3rem;
 }
 
-#dlg-options {
-    display: flex; flex-direction: column; gap: 8px;
+.dlg-close-btn {
+    margin-left: auto;
+    background: none; border: none;
+    color: #6a4820; font-size: 1rem;
+    cursor: pointer; padding: 2px 6px;
+    transition: color 0.15s;
+}
+.dlg-close-btn:hover { color: #c8922a; }
+
+.dlg-input-row {
+    display: flex; gap: 8px; align-items: center;
+    border-top: 1px solid #3a2010; padding-top: 12px;
 }
 
-.dlg-opt {
-    background: rgba(255,255,255,0.03);
+#dlg-input {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
     border: 1px solid #4a3018; border-radius: 4px;
-    color: #c8a878; font-family: 'IM Fell English', serif;
-    font-size: 0.92rem; padding: 10px 16px;
-    text-align: left; cursor: pointer; transition: all 0.15s;
+    color: #d4b896; font-family: 'IM Fell English', serif;
+    font-size: 0.95rem; padding: 9px 13px;
+    outline: none; transition: border-color 0.15s;
 }
-.dlg-opt:hover {
-    background: rgba(200,146,42,0.1);
-    border-color: #c8922a; color: #e8c890;
-    transform: translateX(3px);
+#dlg-input:focus { border-color: #c8922a; }
+#dlg-input::placeholder { color: #5a4030; }
+#dlg-input:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#dlg-send {
+    background: rgba(200,146,42,0.12);
+    border: 1px solid #6a4a20; border-radius: 4px;
+    color: #c8922a; font-size: 1.1rem;
+    padding: 8px 16px; cursor: pointer; transition: all 0.15s;
 }
-.dlg-opt:disabled { opacity: 0.5; cursor: not-allowed; }
+#dlg-send:hover { background: rgba(200,146,42,0.25); border-color: #c8922a; }
+#dlg-send:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── HUD extras ────────────────────────────────────── */
 #hud-location {
