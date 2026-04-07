@@ -24,7 +24,7 @@ function buildVillageTiles() {
     const m = Array.from({length:H_}, () => new Array(W_).fill(TR));
     const s = (x,y,t) => { if(y>=0&&y<H_&&x>=0&&x<W_) m[y][x]=t; };
     const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
-    const house = (x1,y1,x2,y2) => { fill(x1,y1,x2,y2,W); fill(x1+1,y1+1,x2-1,y2-1,F); };
+    const house = (x1,y1,x2,y2) => { fill(x1,y1,x2,y2,W); };
 
     // ── 1. Playable ground ───────────────────────────────────
     fill(1,1,46,34, G);
@@ -61,44 +61,33 @@ function buildVillageTiles() {
     //   G: Chapel          x=27–36, y=29–34   (SE lower)
     //   H: Veyla's Cottage x=38–45, y=19–26   (SE right)
 
-    // A: Elder's Hall — 10×10, two-chamber with council room
+    // A: Elder's Hall — 10×10
     house(2,2, 11,11);
-    for (let x=3;x<=10;x++) s(x,6,W);   // divider wall
-    s(6,6,DR); s(7,6,DR);               // interior arch
     s(6,11,DR); s(7,11,DR);             // south entrance
 
     // B: Merchant House — 7×8
     house(24,2, 30,9);
     s(26,9,DR); s(27,9,DR);             // south entrance
 
-    // C: Blacksmith — 11×10 with forge partition
+    // C: Blacksmith — 11×10
     house(33,2, 43,11);
-    for (let y=3;y<=10;y++) s(39,y,W);  // forge partition at x=39
-    s(39,6,DR); s(39,7,DR);             // forge door
     s(36,11,DR); s(37,11,DR);           // south entrance
 
-    // D: Tavern — 11×9 with bar divider
+    // D: Tavern — 11×9
     house(2,19, 12,27);
-    for (let x=3;x<=11;x++) s(x,23,W); // bar wall
-    s(6,23,DR); s(7,23,DR);             // bar passage
     s(6,19,DR); s(7,19,DR);             // north entrance (faces E–W road gap at y=18)
-    s(5,27,DR); s(6,27,DR);             // south exit
 
     // E: Market Hall — 13×9
     house(24,19, 36,27);
     s(24,22,DR); s(24,23,DR);           // west entrance (faces N–S road at x=22)
-    s(29,27,DR); s(30,27,DR);           // south passage toward chapel
 
     // F: Small Cottage — 8×6
     house(2,29, 9,34);
     s(9,31,DR); s(9,32,DR);             // east entrance
 
-    // G: Chapel — 10×6 with altar alcove
+    // G: Chapel — 10×6
     house(27,29, 36,34);
     s(30,29,DR); s(31,29,DR);           // north entrance
-    s(28,30,W); s(29,30,W);             // altar flanking left
-    s(34,30,W); s(35,30,W);             // altar flanking right
-    s(31,30,SG); s(32,30,SG);           // altar plaque (sign tile)
 
     // H: Veyla's Cottage — 8×8
     house(38,19, 45,26);
@@ -166,15 +155,158 @@ function buildDungeonTiles() {
     return m;
 }
 
+function buildEldersHallInterior() {
+    const W_=14, H_=12;
+    const m = Array.from({length:H_}, () => new Array(W_).fill(W));
+    const s = (x,y,t) => { m[y][x]=t; };
+    const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
+    fill(1,1,W_-2,H_-2, F);
+    // Torches on north wall
+    s(3,0,TC); s(10,0,TC);
+    // Council table (hollow rectangle)
+    fill(2,2,11,5,W); fill(3,3,10,4,F);
+    // Bookcase strip on east wall
+    fill(12,1,12,5,W);
+    // Notice board sign on north wall
+    s(6,0,SG);
+    // Exit tiles
+    s(6,H_-2,SU); s(7,H_-2,SU);
+    return m;
+}
+
+function buildMerchantInterior() {
+    const W_=12, H_=10;
+    const m = Array.from({length:H_}, () => new Array(W_).fill(W));
+    const s = (x,y,t) => { m[y][x]=t; };
+    const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
+    fill(1,1,W_-2,H_-2, F);
+    s(2,0,TC); s(9,0,TC);
+    // L-shape counter
+    fill(1,2,8,2,W);
+    s(8,3,W); s(8,4,W);
+    // Goods display east
+    fill(10,2,10,5,W);
+    s(5,H_-2,SU); s(6,H_-2,SU);
+    return m;
+}
+
+function buildBlacksmithInterior() {
+    const W_=14, H_=12;
+    const m = Array.from({length:H_}, () => new Array(W_).fill(W));
+    const s = (x,y,t) => { m[y][x]=t; };
+    const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
+    fill(1,1,W_-2,H_-2, F);
+    s(2,0,TC); s(11,0,TC);
+    // Forge torch (east side — forge fire)
+    s(11,1,TC);
+    // Anvil
+    s(9,3,W);
+    // Tool rack on north wall
+    fill(2,1,6,1,W);
+    // Weapon rack on west wall
+    fill(1,2,1,6,W);
+    s(6,H_-2,SU); s(7,H_-2,SU);
+    return m;
+}
+
+function buildTavernInterior() {
+    const W_=14, H_=12;
+    const m = Array.from({length:H_}, () => new Array(W_).fill(W));
+    const s = (x,y,t) => { m[y][x]=t; };
+    const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
+    fill(1,1,W_-2,H_-2, F);
+    s(2,0,TC); s(11,0,TC);
+    // Bar counter (L-shape)
+    fill(1,2,9,2,W);
+    fill(1,3,1,5,W);
+    // 2 tables
+    fill(4,5,5,6,W); fill(8,5,9,6,W);
+    // Barrels on east wall
+    fill(12,3,12,6,W);
+    s(6,H_-2,SU); s(7,H_-2,SU);
+    return m;
+}
+
+function buildMarketInterior() {
+    const W_=16, H_=12;
+    const m = Array.from({length:H_}, () => new Array(W_).fill(W));
+    const s = (x,y,t) => { m[y][x]=t; };
+    const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
+    fill(1,1,W_-2,H_-2, F);
+    s(2,0,TC); s(13,0,TC);
+    // 3 market stalls
+    fill(2,2,4,4,W); fill(7,2,9,4,W); fill(12,2,14,4,W);
+    s(7,H_-2,SU); s(8,H_-2,SU);
+    return m;
+}
+
+function buildCottageInterior() {
+    const W_=10, H_=10;
+    const m = Array.from({length:H_}, () => new Array(W_).fill(W));
+    const s = (x,y,t) => { m[y][x]=t; };
+    const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
+    fill(1,1,W_-2,H_-2, F);
+    s(2,0,TC); s(7,0,TC);
+    // Bed (NE)
+    fill(8,1,8,3,W);
+    // Table
+    fill(2,2,3,3,W);
+    // Fireplace on west wall
+    s(1,4,TC);
+    s(4,H_-2,SU); s(5,H_-2,SU);
+    return m;
+}
+
+function buildChapelInterior() {
+    const W_=12, H_=12;
+    const m = Array.from({length:H_}, () => new Array(W_).fill(W));
+    const s = (x,y,t) => { m[y][x]=t; };
+    const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
+    fill(1,1,W_-2,H_-2, F);
+    s(2,0,TC); s(9,0,TC);
+    // Altar signs on north wall
+    s(5,0,SG); s(6,0,SG);
+    // Altar flanking walls
+    s(3,2,W); s(4,2,W); s(7,2,W); s(8,2,W);
+    // Pews (2 rows of 2)
+    fill(2,5,3,5,W); fill(8,5,9,5,W);
+    fill(2,7,3,7,W); fill(8,7,9,7,W);
+    s(5,H_-2,SU); s(6,H_-2,SU);
+    return m;
+}
+
+function buildVeylaInterior() {
+    const W_=12, H_=10;
+    const m = Array.from({length:H_}, () => new Array(W_).fill(W));
+    const s = (x,y,t) => { m[y][x]=t; };
+    const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
+    fill(1,1,W_-2,H_-2, F);
+    s(2,0,TC); s(9,0,TC);
+    // Bookshelves on east/west walls
+    fill(1,2,1,5,W); fill(10,2,10,5,W);
+    // Crystal table centerpiece (hollow)
+    fill(4,3,7,4,W); fill(5,3,6,4,F);
+    s(5,H_-2,SU); s(6,H_-2,SU);
+    return m;
+}
+
 // ═══════════════════════════════════════════════════════
 //  WORLD ENTITY DATA
 // ═══════════════════════════════════════════════════════
-const VILLAGE_NPCS = [
-    { id:'elder', name:'Elder Maren', x:6, y:8, portrait:'👴', color:'#d0c870', history:[],
+const VILLAGE_NPCS = [];  // NPCs are now inside their respective buildings
+
+const ELDER_NPCS = [
+    { id:'elder', name:'Elder Maren', x:6, y:5, portrait:'👴', color:'#d0c870', history:[],
       role:'The elderly leader of Eldoria. Wise but frightened — darkness spreads from the Cursed Mines to the south. He desperately needs someone to investigate. He will explicitly ask the player to enter the mines, promising a reward. If the player has entered the mines (quest_into_dark_complete=true), he reacts with relief and asks what they found.' },
-    { id:'blacksmith', name:'Daran', x:37, y:6, portrait:'🔨', color:'#d07040', history:[],
+];
+
+const BLACKSMITH_NPCS = [
+    { id:'blacksmith', name:'Daran', x:4, y:4, portrait:'🔨', color:'#d07040', history:[],
       role:'The village blacksmith. Gruff, grieving. His brother Henrick went into the mines 3 months ago and never returned. He will ask the player to look for any sign of Henrick. If quest_brothers_fate_complete=true (Henrick\'s ring found), he breaks down and thanks the player, and says at least now he knows.' },
-    { id:'traveler', name:'Veyla', x:41, y:22, portrait:'🧝', color:'#70a0e0', history:[],
+];
+
+const VEYLA_NPCS = [
+    { id:'traveler', name:'Veyla', x:5, y:2, portrait:'🧝', color:'#70a0e0', history:[],
       role:'A mysterious elven wanderer. Cryptic, testing. She knows an ancient sealed entity called the Hollow King lies in the mines. She will ask the player to find the ancient tablet that describes the seal. If quest_sealed_truth_complete=true, she reveals she is a Warden\'s descendant sent to reinforce the seal.' },
 ];
 
@@ -224,6 +356,111 @@ const MAPS = {
         playerStart:{x:4,y:4},
         name:'Cursed Mines — Floor 1',
         dark:true,
+    },
+    int_elder: {
+        id:'int_elder', w:14, h:12,
+        tiles: buildEldersHallInterior(),
+        npcs:  ELDER_NPCS,
+        signs: [{ x:6, y:0, text:"ELDER'S HALL\n\nThe council chamber of Eldoria.\nAll matters of import are decided here." }],
+        items: [],
+        playerStart:{x:6, y:8},
+        name:"Elder's Hall",
+        dark:false,
+        returnMap:'village', returnX:6, returnY:12,
+    },
+    int_merchant: {
+        id:'int_merchant', w:12, h:10,
+        tiles: buildMerchantInterior(),
+        npcs:  [],
+        signs: [],
+        items: [],
+        playerStart:{x:5, y:6},
+        name:'Merchant House',
+        dark:false,
+        returnMap:'village', returnX:26, returnY:10,
+    },
+    int_blacksmith: {
+        id:'int_blacksmith', w:14, h:12,
+        tiles: buildBlacksmithInterior(),
+        npcs:  BLACKSMITH_NPCS,
+        signs: [],
+        items: [],
+        playerStart:{x:6, y:8},
+        name:"Daran's Forge",
+        dark:false,
+        returnMap:'village', returnX:36, returnY:12,
+    },
+    int_tavern: {
+        id:'int_tavern', w:14, h:12,
+        tiles: buildTavernInterior(),
+        npcs:  [],
+        signs: [],
+        items: [],
+        playerStart:{x:6, y:8},
+        name:'The Wanderer\'s Rest',
+        dark:false,
+        returnMap:'village', returnX:6, returnY:18,
+    },
+    int_market: {
+        id:'int_market', w:16, h:12,
+        tiles: buildMarketInterior(),
+        npcs:  [],
+        signs: [],
+        items: [],
+        playerStart:{x:7, y:8},
+        name:'Market Hall',
+        dark:false,
+        returnMap:'village', returnX:23, returnY:22,
+    },
+    int_cottage: {
+        id:'int_cottage', w:10, h:10,
+        tiles: buildCottageInterior(),
+        npcs:  [],
+        signs: [],
+        items: [],
+        playerStart:{x:4, y:6},
+        name:'Village Cottage',
+        dark:false,
+        returnMap:'village', returnX:10, returnY:31,
+    },
+    int_chapel: {
+        id:'int_chapel', w:12, h:12,
+        tiles: buildChapelInterior(),
+        npcs:  [],
+        signs: [{ x:5, y:0, text:"CHAPEL OF THE OLD GODS\n\n\"Light endures.\nDarkness merely waits its turn.\"\n\n— The Third Scripture" },
+                { x:6, y:0, text:"CHAPEL OF THE OLD GODS\n\n\"Light endures.\nDarkness merely waits its turn.\"\n\n— The Third Scripture" }],
+        items: [],
+        playerStart:{x:5, y:8},
+        name:'Chapel of the Old Gods',
+        dark:false,
+        returnMap:'village', returnX:30, returnY:30,
+    },
+    int_veyla: {
+        id:'int_veyla', w:12, h:10,
+        tiles: buildVeylaInterior(),
+        npcs:  VEYLA_NPCS,
+        signs: [],
+        items: [],
+        playerStart:{x:5, y:6},
+        name:"Veyla's Study",
+        dark:false,
+        returnMap:'village', returnX:41, returnY:20,
+    },
+};
+
+// ═══════════════════════════════════════════════════════
+//  BUILDING ENTRANCE LOOKUP
+// ═══════════════════════════════════════════════════════
+const BUILDING_ENTRANCES = {
+    village: {
+        '6,11':'int_elder',   '7,11':'int_elder',
+        '26,9':'int_merchant','27,9':'int_merchant',
+        '36,11':'int_blacksmith','37,11':'int_blacksmith',
+        '6,19':'int_tavern',  '7,19':'int_tavern',
+        '24,22':'int_market', '24,23':'int_market',
+        '9,31':'int_cottage', '9,32':'int_cottage',
+        '30,29':'int_chapel', '31,29':'int_chapel',
+        '41,19':'int_veyla',  '42,19':'int_veyla',
     },
 };
 
@@ -335,6 +572,12 @@ function tryMove(dx, dy, facing) {
     const tile = currentMap.tiles[ny][nx];
     if (!WALKABLE.has(tile)) return false;
     player.x = nx; player.y = ny;
+    // Building entry via door tiles
+    if (tile === TILE.DOOR) {
+        const key = `${nx},${ny}`;
+        const entrances = BUILDING_ENTRANCES[currentMap.id];
+        if (entrances?.[key]) { changeMap(entrances[key]); return true; }
+    }
     // Stairs transitions
     if (tile === TILE.STAIRS)   handleStairsDown();
     if (tile === TILE.STAIRSUP) handleStairsUp();
@@ -359,7 +602,11 @@ function handleStairsDown() {
 }
 
 function handleStairsUp() {
-    changeMap('village', 22, 32);
+    if (currentMap.returnMap) {
+        changeMap(currentMap.returnMap, currentMap.returnX, currentMap.returnY);
+    } else {
+        changeMap('village', 22, 32);
+    }
 }
 
 function changeMap(mapId, sx, sy) {
@@ -426,223 +673,185 @@ function drawTile(tile, px, py, tx, ty) {
 }
 
 function drawGrass(px, py, tx, ty) {
-    const s = tx*7+ty*13;
-    const shades = ['#2d5a1b','#305e1e','#2a5618','#326020','#2e5c1c','#2b5a1a','#306218'];
-    ctx.fillStyle = shades[s % shades.length]; ctx.fillRect(px,py,TS,TS);
-    if (s%4===0) { ctx.fillStyle='rgba(0,0,0,0.08)'; ctx.fillRect(px+TS*.08,py+TS*.08,TS*.42,TS*.38); }
-    ctx.strokeStyle='#3a7022'; ctx.lineWidth=1.2;
-    for (let i=0;i<5;i++) {
-        const bx=px+3+((s*3+i*17)%(TS-6)), by=py+4+((s*7+i*13)%(TS-9));
-        const lean=((s+i*3)%5-2)*2;
-        ctx.beginPath(); ctx.moveTo(bx,by+6); ctx.lineTo(bx+lean,by); ctx.stroke();
-    }
-    if (s%11===0) {
-        const fx=px+5+(s%(TS-10)), fy=py+5+((s*3)%(TS-10));
-        ctx.fillStyle=(s%2===0)?'#e8d848':'#e87878';
-        ctx.beginPath(); ctx.arc(fx,fy,2,0,Math.PI*2); ctx.fill();
-        ctx.fillStyle='#ffffa0'; ctx.beginPath(); ctx.arc(fx,fy,1,0,Math.PI*2); ctx.fill();
+    const s = tx*7 + ty*13;
+    const U = Math.max(1, Math.floor(TS/16));
+    // 2-tone checkerboard base
+    ctx.fillStyle = (tx+ty)%2 ? '#3c8c2c' : '#388828';
+    ctx.fillRect(Math.floor(px), Math.floor(py), TS, TS);
+    // 3 pixel highlight rects
+    ctx.fillStyle = '#48a834';
+    ctx.fillRect(Math.floor(px + ((s*3)%14)*U),    Math.floor(py + ((s*7)%14)*U),    U, U);
+    ctx.fillRect(Math.floor(px + ((s*11)%14)*U),   Math.floor(py + ((s*13+4)%14)*U), U, U);
+    ctx.fillRect(Math.floor(px + ((s*5+7)%14)*U),  Math.floor(py + ((s*9+3)%14)*U),  U, U);
+    // 2 grass tufts (1×3U)
+    ctx.fillStyle = '#56b840';
+    ctx.fillRect(Math.floor(px + ((s*17)%13)*U),   Math.floor(py + ((s*19+2)%10)*U), U, U*3);
+    ctx.fillRect(Math.floor(px + ((s*23+5)%13)*U), Math.floor(py + ((s*29+6)%10)*U), U, U*3);
+    // Flower (1 in 13 tiles)
+    if (s % 13 === 0) {
+        const fx = Math.floor(px + TS*.3), fy = Math.floor(py + TS*.3);
+        ctx.fillStyle = (s%2===0) ? '#e8d030' : '#e87878';
+        ctx.fillRect(fx, fy, U*2, U*2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(fx+U, fy+U, U, U);
     }
 }
 
 function drawPath(px, py, tx, ty) {
-    const s = tx*11+ty*7;
-    ctx.fillStyle='#5e4610'; ctx.fillRect(px,py,TS,TS);
-    const stones=[{rx:.06,ry:.06,rw:.42,rh:.44},{rx:.52,ry:.06,rw:.42,rh:.44},
-                  {rx:.06,ry:.54,rw:.42,rh:.40},{rx:.52,ry:.54,rw:.42,rh:.40}];
-    const cols=['#8a7040','#907848','#7a6030','#9a7848','#857038'];
-    stones.forEach((st,i) => {
-        const col=cols[(s+i*3)%cols.length];
-        const sx=px+st.rx*TS, sy=py+st.ry*TS, sw=st.rw*TS, sh=st.rh*TS, r=TS*.04;
-        ctx.fillStyle=col;
-        ctx.beginPath();
-        ctx.moveTo(sx+r,sy); ctx.lineTo(sx+sw-r,sy); ctx.quadraticCurveTo(sx+sw,sy,sx+sw,sy+r);
-        ctx.lineTo(sx+sw,sy+sh-r); ctx.quadraticCurveTo(sx+sw,sy+sh,sx+sw-r,sy+sh);
-        ctx.lineTo(sx+r,sy+sh); ctx.quadraticCurveTo(sx,sy+sh,sx,sy+sh-r);
-        ctx.lineTo(sx,sy+r); ctx.quadraticCurveTo(sx,sy,sx+r,sy); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle='rgba(255,255,255,0.14)'; ctx.lineWidth=1;
-        ctx.beginPath(); ctx.moveTo(sx+r,sy); ctx.lineTo(sx+sw-r,sy); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(sx,sy+r); ctx.lineTo(sx,sy+sh*.5); ctx.stroke();
-        ctx.strokeStyle='rgba(0,0,0,0.22)';
-        ctx.beginPath(); ctx.moveTo(sx+sw-r,sy+sh); ctx.lineTo(sx+r,sy+sh); ctx.stroke();
+    const s = tx*11 + ty*7;
+    const gap = Math.max(1, Math.floor(TS/20));
+    const half = Math.floor(TS/2);
+    // Mortar base
+    ctx.fillStyle = '#8a7030';
+    ctx.fillRect(Math.floor(px), Math.floor(py), TS, TS);
+    // 4 flat cobblestones in 2×2 grid
+    const cols = ['#b49040','#c4a850','#a87c30','#bc9848'];
+    const offsets = [[gap, gap],[half+gap, gap],[gap, half+gap],[half+gap, half+gap]];
+    offsets.forEach(([ox, oy], i) => {
+        const sx = Math.floor(px+ox), sy = Math.floor(py+oy);
+        const sw = half - gap*2, sh = half - gap*2;
+        ctx.fillStyle = cols[(s+i) % cols.length];
+        ctx.fillRect(sx, sy, sw, sh);
+        // top 1-px highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(sx, sy, sw, 1);
+        // bottom 1-px shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(sx, sy+sh-1, sw, 1);
     });
 }
 
 function drawFloor(px, py, dark) {
-    ctx.fillStyle = dark ? '#131018' : '#2a2028'; ctx.fillRect(px,py,TS,TS);
-    const bW=Math.round(TS/2), bH=Math.round(TS/2);
-    const mortar = dark ? '#0a080d' : '#181018';
-    const bCols = dark
-        ? ['#1e1820','#1a141c','#22182a','#1c1420']
-        : ['#342830','#2e2228','#38282e','#2c2028'];
-    for (let row=0;row<2;row++) {
-        const by=py+row*bH, shift=row%2===0?0:Math.round(TS/4);
-        for (let col=0;col<3;col++) {
-            const bx=px+col*bW-shift;
-            const x1=Math.max(px,bx)+1, x2=Math.min(px+TS,bx+bW)-1;
-            const y1=by+1, y2=by+bH-1; if (x2<=x1) continue;
-            ctx.fillStyle=bCols[(row*3+col)%bCols.length]; ctx.fillRect(x1,y1,x2-x1,y2-y1);
-            ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(x1,y1,x2-x1,1);
-            if ((row+col)%3===0) {
-                ctx.strokeStyle='rgba(0,0,0,0.16)'; ctx.lineWidth=.5;
-                ctx.beginPath(); ctx.moveTo(x1+(x2-x1)*.25,y1+(y2-y1)*.3);
-                ctx.lineTo(x1+(x2-x1)*.45,y1+(y2-y1)*.75); ctx.stroke();
-            }
-        }
-        ctx.fillStyle=mortar; ctx.fillRect(px,by,TS,1);
-        for (let col=1;col<3;col++) {
-            const vx=px+col*bW-shift;
-            if (vx>px&&vx<px+TS) { ctx.fillStyle=mortar; ctx.fillRect(vx,by,1,bH); }
-        }
+    const darkCols  = ['#231830','#2e2040','#1a1028'];
+    const lightCols = ['#8a5a28','#7a4e20','#9a6832'];
+    const cols = dark ? darkCols : lightCols;
+    const plankH = Math.floor(TS/3);
+    // vertical joint offset alternates per tile column
+    const jointX = Math.floor(px/TS) % 2 === 0 ? Math.floor(TS*.42) : Math.floor(TS*.60);
+    for (let i = 0; i < 3; i++) {
+        const py2 = Math.floor(py + i*plankH);
+        const h   = (i === 2) ? TS - 2*plankH : plankH;
+        ctx.fillStyle = cols[i];
+        ctx.fillRect(Math.floor(px), py2, TS, h);
+        // top highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        ctx.fillRect(Math.floor(px), py2, TS, 1);
+        // vertical joint divider
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.fillRect(Math.floor(px)+jointX, py2, 1, h);
     }
 }
 
 function drawWall(px, py, dark) {
-    ctx.fillStyle = dark ? '#100c10' : '#221818'; ctx.fillRect(px,py,TS,TS);
-    const bW=Math.round(TS*.46), bH=Math.round(TS*.30);
-    const mortar = dark ? '#080610' : '#120c0e';
-    for (let row=0;row<5;row++) {
-        const by=py+row*bH-Math.round(bH/2);
-        if (by+bH<py||by>py+TS) continue;
-        const offset=(row%2)*Math.round(bW/2);
-        for (let col=-1;col<4;col++) {
-            const bx=px+col*bW+offset; if (bx+bW<px||bx>px+TS) continue;
-            const cx2=Math.max(px+1,bx+2), cy2=Math.max(py+1,by+2);
-            const cw=Math.min(px+TS-1,bx+bW-1)-cx2, ch=Math.min(py+TS-1,by+bH-1)-cy2;
-            if (cw<=0||ch<=0) continue;
-            ctx.fillStyle=(row+col)%3===2?(dark?'#161018':'#281c1c'):(dark?'#1a1218':'#2e2020');
-            ctx.fillRect(cx2,cy2,cw,ch);
-            ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(cx2,cy2,cw,2);
-            ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fillRect(cx2,cy2,2,ch);
-            ctx.fillStyle='rgba(0,0,0,0.20)'; ctx.fillRect(cx2,cy2+ch-2,cw,2);
-            ctx.fillStyle='rgba(0,0,0,0.14)'; ctx.fillRect(cx2+cw-2,cy2,2,ch);
+    const mortar   = dark ? '#120e18' : '#4a3828';
+    const brickCols = dark
+        ? ['#1c1428','#221830','#181222']
+        : ['#6a4830','#7a5838','#5c3c24'];
+    // Mortar base
+    ctx.fillStyle = mortar;
+    ctx.fillRect(Math.floor(px), Math.floor(py), TS, TS);
+    // Top accent strip
+    ctx.fillStyle = dark ? '#1a1422' : '#5a4432';
+    ctx.fillRect(Math.floor(px), Math.floor(py), TS, Math.max(1, Math.floor(TS*.06)));
+    // 4 brick rows, each offset half a brick
+    const bH = Math.floor(TS/4), bW = Math.floor(TS/2);
+    for (let row = 0; row < 4; row++) {
+        const by = Math.floor(py + row*bH);
+        const offset = (row%2) * Math.floor(bW/2);
+        for (let col = -1; col < 3; col++) {
+            const bx = Math.floor(px + col*bW + offset);
+            const x1 = Math.max(Math.floor(px)+1, bx+1);
+            const x2 = Math.min(Math.floor(px)+TS-1, bx+bW-1);
+            const y1 = by+1, y2 = by+bH-1;
+            if (x2 <= x1 || y2 <= y1) continue;
+            ctx.fillStyle = brickCols[(row+col+3) % brickCols.length];
+            ctx.fillRect(x1, y1, x2-x1, y2-y1);
+            // top 1-px highlight
+            ctx.fillStyle = 'rgba(255,255,255,0.08)';
+            ctx.fillRect(x1, y1, x2-x1, 1);
+            // bottom 1-px shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.20)';
+            ctx.fillRect(x1, y2-1, x2-x1, 1);
         }
-        ctx.fillStyle=mortar; ctx.fillRect(px,by,TS,2);
     }
 }
 
 function drawTree(px, py, tx, ty) {
-    const s = tx*5 + ty*9;
-
-    // 1. Grass ground — tree sits naturally on terrain
+    // 1. Grass base
     drawGrass(px, py, tx, ty);
-
-    // 2. Canopy shadow cast on the ground beneath
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    // 2. Ground shadow (flat ellipse)
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
-    ctx.ellipse(px+TS*.52, py+TS*.68, TS*.36, TS*.13, 0.15, 0, Math.PI*2);
+    ctx.ellipse(Math.floor(px+TS*.52), Math.floor(py+TS*.68), TS*.34, TS*.12, 0, 0, Math.PI*2);
     ctx.fill();
-
-    // 3. Exposed surface roots radiating outward
-    ctx.strokeStyle = '#3a2010'; ctx.lineWidth = TS*.045; ctx.lineCap = 'round';
-    const rootAngles = [Math.PI*.15, Math.PI*.5, Math.PI*.85, Math.PI*1.2, Math.PI*1.6];
-    rootAngles.forEach((a, i) => {
-        const a2 = a + ((s + i*17) % 7) * 0.08;
-        ctx.beginPath();
-        ctx.moveTo(px+TS*.50, py+TS*.65);
-        ctx.quadraticCurveTo(
-            px+TS*.50 + Math.cos(a2)*TS*.18, py+TS*.65 + Math.sin(a2)*TS*.09,
-            px+TS*.50 + Math.cos(a2)*TS*.30, py+TS*.65 + Math.sin(a2)*TS*.14
-        );
-        ctx.stroke();
-    });
-
-    // 4. Trunk — tapered, gradient-shaded
-    const tg = ctx.createLinearGradient(px+TS*.42, 0, px+TS*.58, 0);
-    tg.addColorStop(0, '#4a2808'); tg.addColorStop(0.35, '#6e3e14'); tg.addColorStop(1, '#3a1e08');
-    ctx.fillStyle = tg;
-    ctx.beginPath();
-    ctx.moveTo(px+TS*.57, py+TS*.66);
-    ctx.lineTo(px+TS*.54, py+TS*.44);
-    ctx.lineTo(px+TS*.46, py+TS*.44);
-    ctx.lineTo(px+TS*.43, py+TS*.66);
-    ctx.closePath(); ctx.fill();
-    // Trunk bark highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.09)';
-    ctx.fillRect(px+TS*.46, py+TS*.44, TS*.04, TS*.22);
-    // Bark shadow line
-    ctx.fillStyle = 'rgba(0,0,0,0.20)';
-    ctx.fillRect(px+TS*.54, py+TS*.44, TS*.03, TS*.22);
-
-    // 5. Canopy — three layers, bottom to top
-    const layers = [{cy:.50, r:.40}, {cy:.34, r:.31}, {cy:.20, r:.22}];
-    const baseC  = ['#1a4a08','#20600e','#287014'];
-    const hiC    = ['#226012','#2a741a','#348220'];
-    layers.forEach((l, i) => {
-        const cx = px+TS*.5, cy = py+TS*l.cy, r = TS*l.r;
-        // Dark shadow side (bottom-right of each layer)
-        ctx.fillStyle = `rgba(0,0,0,${0.18 - i*.03})`;
-        ctx.beginPath(); ctx.arc(cx+r*.25, cy+r*.25, r*.88, 0, Math.PI*2); ctx.fill();
-        // Cluster bumps around perimeter
-        for (let b = 0; b < 5; b++) {
-            const a = (b/5)*Math.PI*2 + s*.31 + i*.7;
-            ctx.fillStyle = baseC[i];
-            ctx.beginPath();
-            ctx.arc(cx+Math.cos(a)*r*.62, cy+Math.sin(a)*r*.48, r*.48, 0, Math.PI*2);
-            ctx.fill();
-        }
-        // Main circle
-        ctx.fillStyle = baseC[i];
-        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
-        // Light side highlight
-        ctx.fillStyle = hiC[i];
-        ctx.beginPath(); ctx.arc(cx-r*.18, cy-r*.18, r*.68, 0, Math.PI*2); ctx.fill();
-        // Bright specular spot (sunlight)
-        ctx.fillStyle = 'rgba(160,240,80,0.15)';
-        ctx.beginPath(); ctx.arc(cx-r*.30, cy-r*.32, r*.26, 0, Math.PI*2); ctx.fill();
-    });
-
-    // 6. Stray leaf clusters draping over the ground edge of the canopy
-    ctx.fillStyle = 'rgba(26,70,8,0.75)';
-    for (let i = 0; i < 6; i++) {
-        const a = (i/6)*Math.PI*2 + s*.19;
-        const lr = TS*.40;
-        ctx.beginPath();
-        ctx.arc(px+TS*.5+Math.cos(a)*lr*.88, py+TS*.50+Math.sin(a)*lr*.55, TS*.07, 0, Math.PI*2);
-        ctx.fill();
-    }
+    // 3. Trunk (two flat rects — dark base + lighter center strip)
+    ctx.fillStyle = '#4a2808';
+    ctx.fillRect(Math.floor(px+TS*.44), Math.floor(py+TS*.44), Math.floor(TS*.12), Math.floor(TS*.22));
+    ctx.fillStyle = '#6e3e14';
+    ctx.fillRect(Math.floor(px+TS*.46), Math.floor(py+TS*.44), Math.floor(TS*.05), Math.floor(TS*.22));
+    // 4. Canopy — 3 flat arc passes (no gradient)
+    const cx2 = Math.floor(px+TS*.5), cy2 = Math.floor(py+TS*.38), r = TS*.38;
+    // Dark outer ring
+    ctx.fillStyle = '#1a4a08';
+    ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, Math.PI*2); ctx.fill();
+    // Main mid-green
+    ctx.fillStyle = '#2a6814';
+    ctx.beginPath(); ctx.arc(cx2, cy2 - Math.floor(r*.06), Math.floor(r*.84), 0, Math.PI*2); ctx.fill();
+    // Lighter highlight offset upper-left
+    ctx.fillStyle = '#3a8020';
+    ctx.beginPath(); ctx.arc(cx2 - Math.floor(r*.18), cy2 - Math.floor(r*.20), Math.floor(r*.62), 0, Math.PI*2); ctx.fill();
+    // Bright specular rect upper-left (flat rect instead of arc)
+    ctx.fillStyle = '#50a030';
+    ctx.fillRect(Math.floor(cx2 - r*.38), Math.floor(cy2 - r*.44), Math.floor(r*.28), Math.floor(r*.22));
 }
 
 function drawWater(px, py) {
-    const t=timeMs/1000;
-    const gr=ctx.createLinearGradient(px,py,px,py+TS);
-    gr.addColorStop(0,'#122e42'); gr.addColorStop(1,'#081824');
-    ctx.fillStyle=gr; ctx.fillRect(px,py,TS,TS);
-    for (let i=0;i<3;i++) {
-        const wy=py+(TS/4)*(i+1)+Math.sin(t*1.4+px*.04+i*1.2)*2.5;
-        ctx.strokeStyle=`rgba(80,160,210,${0.28+0.14*Math.sin(t*1.8+i)})`; ctx.lineWidth=1.2;
-        ctx.beginPath(); ctx.moveTo(px+2,wy);
-        ctx.bezierCurveTo(px+TS*.28,wy-2.5,px+TS*.72,wy+2.5,px+TS-2,wy); ctx.stroke();
+    const t = timeMs/1000;
+    // Dark base
+    ctx.fillStyle = '#1a5a8c';
+    ctx.fillRect(Math.floor(px), Math.floor(py), TS, TS);
+    // Lighter mid band
+    ctx.fillStyle = '#2472a8';
+    ctx.fillRect(Math.floor(px), Math.floor(py+TS*.35), TS, Math.floor(TS*.30));
+    // 3 animated wave bands (flat fillRect)
+    for (let i = 0; i < 3; i++) {
+        const wy = Math.floor(py + (TS/4)*(i+1) + Math.sin(t*1.4+px*.04+i*1.2)*2);
+        ctx.fillStyle = `rgba(80,160,210,${0.25+0.12*Math.sin(t*1.8+i)})`;
+        ctx.fillRect(Math.floor(px+TS*.05), wy, Math.floor(TS*.90), Math.max(1, Math.floor(TS*.06)));
     }
-    ctx.fillStyle=`rgba(160,220,255,${(0.5+0.3*Math.sin(t*2.5+px*.1))*0.11})`;
-    ctx.fillRect(px+TS*.1,py+TS*.14,TS*.18,TS*.06);
+    // Glint top-left
+    ctx.fillStyle = 'rgba(200,235,255,0.22)';
+    ctx.fillRect(Math.floor(px+TS*.08), Math.floor(py+TS*.10), Math.floor(TS*.18), Math.floor(TS*.06));
 }
 
 function drawDoor(px, py) {
-    ctx.fillStyle='#2e2020'; ctx.fillRect(px,py,TS,TS);
-    ctx.fillStyle='#221818';
-    ctx.fillRect(px,py,TS*.14,TS); ctx.fillRect(px+TS*.86,py,TS*.14,TS);
-    ctx.fillRect(px,py,TS,TS*.07);
-    const plankH=TS*.88/3;
-    const plankC=['#6a3c14','#5e3010','#723e16'];
-    for (let i=0;i<3;i++) {
-        ctx.fillStyle=plankC[i%3]; ctx.fillRect(px+TS*.15,py+TS*.07+i*plankH,TS*.70,plankH-2);
-        ctx.strokeStyle='rgba(0,0,0,0.14)'; ctx.lineWidth=.7;
-        for (let g=0;g<4;g++) {
-            const gx=px+TS*.18+g*(TS*.16);
-            ctx.beginPath(); ctx.moveTo(gx,py+TS*.08+i*plankH); ctx.lineTo(gx+1.5,py+TS*.07+(i+1)*plankH-2); ctx.stroke();
+    const dark = currentMap.dark;
+    drawWall(px, py, dark);
+    // 3 flat wood planks
+    const plankH = Math.floor(TS*.88/3);
+    const plankC = ['#7a4018','#8a4c20','#6a3410'];
+    for (let i = 0; i < 3; i++) {
+        const plankY = Math.floor(py+TS*.07+i*plankH);
+        ctx.fillStyle = plankC[i];
+        ctx.fillRect(Math.floor(px+TS*.15), plankY, Math.floor(TS*.70), plankH-1);
+        // top highlight per plank
+        ctx.fillStyle = 'rgba(255,255,255,0.09)';
+        ctx.fillRect(Math.floor(px+TS*.15), plankY, Math.floor(TS*.70), 1);
+        // 3 grain lines per plank
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        for (let g = 0; g < 3; g++) {
+            ctx.fillRect(Math.floor(px+TS*.19+g*(TS*.20)), plankY+2, 1, plankH-4);
         }
-        ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(px+TS*.15,py+TS*.07+i*plankH,TS*.70,2);
     }
-    ctx.fillStyle='#2a2a2a';
-    [.18,.62].forEach(hy => {
-        ctx.fillRect(px+TS*.12,py+TS*hy,TS*.12,TS*.12);
-        ctx.fillStyle='#404040'; ctx.fillRect(px+TS*.13,py+TS*hy+1,TS*.04,TS*.10);
-        ctx.fillStyle='#2a2a2a';
-    });
-    ctx.fillStyle='#3a3a3a'; ctx.fillRect(px+TS*.74,py+TS*.40,TS*.06,TS*.20);
-    ctx.fillStyle='#525252'; ctx.beginPath(); ctx.arc(px+TS*.77,py+TS*.44,TS*.036,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#181010'; ctx.beginPath(); ctx.arc(px+TS*.77,py+TS*.51,TS*.020,0,Math.PI*2); ctx.fill();
-    ctx.fillRect(px+TS*.758,py+TS*.51,TS*.024,TS*.04);
+    // Hinges: 2 dark gray rects
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(Math.floor(px+TS*.13), Math.floor(py+TS*.18), Math.floor(TS*.10), Math.floor(TS*.10));
+    ctx.fillRect(Math.floor(px+TS*.13), Math.floor(py+TS*.62), Math.floor(TS*.10), Math.floor(TS*.10));
+    // Knob: 2 stacked rects
+    ctx.fillStyle = '#505050';
+    ctx.fillRect(Math.floor(px+TS*.74), Math.floor(py+TS*.42), Math.floor(TS*.06), Math.floor(TS*.08));
+    ctx.fillStyle = '#707070';
+    ctx.fillRect(Math.floor(px+TS*.75), Math.floor(py+TS*.45), Math.floor(TS*.04), Math.floor(TS*.04));
 }
 
 function drawStairs(px, py) {
@@ -663,6 +872,21 @@ function drawStairs(px, py) {
 }
 
 function drawStairsUp(px, py) {
+    if (currentMap?.returnMap) {
+        // Interior exit — draw as a floor doormat with EXIT label
+        drawFloor(px, py, false);
+        ctx.fillStyle = '#6a3a10';
+        ctx.fillRect(Math.floor(px+TS*.10), Math.floor(py+TS*.25), Math.floor(TS*.80), Math.floor(TS*.50));
+        ctx.fillStyle = '#8a5020';
+        for (let i = 0; i < 4; i++) {
+            ctx.fillRect(Math.floor(px+TS*.15+i*TS*.18), Math.floor(py+TS*.30), Math.max(1,Math.floor(TS*.04)), Math.floor(TS*.40));
+        }
+        ctx.fillStyle = '#c8a050';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = `bold ${Math.floor(TS*.22)}px sans-serif`;
+        ctx.fillText('EXIT', Math.floor(px+TS/2), Math.floor(py+TS*.52));
+        return;
+    }
     ctx.fillStyle='#0e1812'; ctx.fillRect(px,py,TS,TS);
     for (let i=4;i>=0;i--) {
         const sy=py+i*(TS/5), inset=(4-i)*(TS/11);
@@ -680,74 +904,42 @@ function drawStairsUp(px, py) {
 }
 
 function drawSignPost(px, py) {
-    // ── Post ─────────────────────────────────────────────
-    const postGrad = ctx.createLinearGradient(px+TS*.43, 0, px+TS*.58, 0);
-    postGrad.addColorStop(0,   '#4a2808');
-    postGrad.addColorStop(0.3, '#7a4418');
-    postGrad.addColorStop(1,   '#3a1e08');
-    ctx.fillStyle = postGrad;
-    ctx.fillRect(px+TS*.44, py+TS*.32, TS*.12, TS*.68);
-    // Post highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.10)';
-    ctx.fillRect(px+TS*.45, py+TS*.32, TS*.025, TS*.68);
-    // Post shadow line
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.fillRect(px+TS*.54, py+TS*.32, TS*.02, TS*.68);
-    // Bark grain
-    ctx.strokeStyle = 'rgba(0,0,0,0.14)'; ctx.lineWidth = 0.8;
-    for (let i=0; i<3; i++) {
-        const gx = px+TS*.46 + i*TS*.025;
-        ctx.beginPath(); ctx.moveTo(gx, py+TS*.35); ctx.lineTo(gx+0.5, py+TS); ctx.stroke();
-    }
+    const U = Math.max(1, Math.floor(TS/16));
+    // ── Post (3-color flat strips) ──────────────────────
+    const postX = Math.floor(px+TS*.44), postY = Math.floor(py+TS*.32);
+    const postW = Math.floor(TS*.12), postH = Math.floor(TS*.68);
+    ctx.fillStyle = '#4a2808'; ctx.fillRect(postX, postY, postW, postH);
+    ctx.fillStyle = '#6e3e14'; ctx.fillRect(postX+Math.floor(postW*.25), postY, Math.floor(postW*.35), postH);
+    ctx.fillStyle = '#3a1e08'; ctx.fillRect(postX+Math.floor(postW*.75), postY, Math.floor(postW*.25), postH);
 
-    // ── Board drop-shadow ──────────────────────────────────
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    const bx=px+TS*.08, by=py+TS*.04, bw=TS*.84, bh=TS*.30, r=TS*.05;
-    ctx.beginPath(); ctx.roundRect(bx+2, by+3, bw, bh, r); ctx.fill();
+    // ── Board ──────────────────────────────────────────
+    const bx = Math.floor(px+TS*.08), by = Math.floor(py+TS*.04);
+    const bw = Math.floor(TS*.84),    bh = Math.floor(TS*.30);
+    // Dark border fill
+    ctx.fillStyle = '#4a2808'; ctx.fillRect(bx, by, bw, bh);
+    // Mid color
+    ctx.fillStyle = '#8a5018'; ctx.fillRect(bx+1, by+1, bw-2, bh-2);
+    // Lighter top half
+    ctx.fillStyle = '#b07028'; ctx.fillRect(bx+1, by+1, bw-2, Math.floor(bh/2)-1);
 
-    // ── Board body ─────────────────────────────────────────
-    const boardGrad = ctx.createLinearGradient(px, py+TS*.04, px, py+TS*.34);
-    boardGrad.addColorStop(0, '#b07028');
-    boardGrad.addColorStop(0.6, '#8a5018');
-    boardGrad.addColorStop(1, '#6a3a0c');
-    ctx.fillStyle = boardGrad;
-    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, r); ctx.fill();
-
-    // Board border
-    ctx.strokeStyle = '#4a2808'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, r); ctx.stroke();
-
-    // Board top highlight bevel
-    ctx.fillStyle = 'rgba(255,255,255,0.13)';
-    ctx.beginPath(); ctx.roundRect(bx+1, by+1, bw-2, bh*.28, r*.7); ctx.fill();
-
-    // Wood grain lines on board
-    ctx.strokeStyle = 'rgba(0,0,0,0.10)'; ctx.lineWidth = 0.9;
-    for (let i=0; i<3; i++) {
-        const gy = by + bh*.22 + i*(bh*.22);
-        ctx.beginPath(); ctx.moveTo(bx+r, gy); ctx.lineTo(bx+bw-r, gy+0.8); ctx.stroke();
-    }
-
-    // Carved text lines (recessed look)
+    // Carved text lines
+    const lm = bx + Math.floor(bw*.14), lw = Math.floor(bw*.72);
     ctx.fillStyle = 'rgba(50,20,5,0.70)';
-    const lm = bx + bw*.14, lw = bw*.72;
-    ctx.fillRect(lm,      by+bh*.22, lw,       2);
-    ctx.fillRect(lm,      by+bh*.46, lw,       2);
-    ctx.fillRect(lm,      by+bh*.68, lw*.55,   2);
-    // Carved highlight (gives depth)
+    ctx.fillRect(lm, Math.floor(by+bh*.22), lw,                 2);
+    ctx.fillRect(lm, Math.floor(by+bh*.46), lw,                 2);
+    ctx.fillRect(lm, Math.floor(by+bh*.68), Math.floor(lw*.55), 2);
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.fillRect(lm,      by+bh*.22+2, lw,     1);
-    ctx.fillRect(lm,      by+bh*.46+2, lw,     1);
-    ctx.fillRect(lm,      by+bh*.68+2, lw*.55, 1);
+    ctx.fillRect(lm, Math.floor(by+bh*.22)+2, lw,                 1);
+    ctx.fillRect(lm, Math.floor(by+bh*.46)+2, lw,                 1);
+    ctx.fillRect(lm, Math.floor(by+bh*.68)+2, Math.floor(lw*.55), 1);
 
-    // Small nail heads at board corners
+    // 4 corner nail dots (flat rects)
     ctx.fillStyle = '#2a1a08';
-    [[bx+bw*.12, by+bh*.18],[bx+bw*.88, by+bh*.18],
-     [bx+bw*.12, by+bh*.80],[bx+bw*.88, by+bh*.80]].forEach(([nx,ny]) => {
-        ctx.beginPath(); ctx.arc(nx, ny, TS*.025, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle='rgba(255,255,255,0.18)';
-        ctx.beginPath(); ctx.arc(nx-1, ny-1, TS*.010, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle='#2a1a08';
+    [[bx+Math.floor(bw*.12), by+Math.floor(bh*.18)],
+     [bx+Math.floor(bw*.88), by+Math.floor(bh*.18)],
+     [bx+Math.floor(bw*.12), by+Math.floor(bh*.80)],
+     [bx+Math.floor(bw*.88), by+Math.floor(bh*.80)]].forEach(([nx,ny]) => {
+        ctx.fillRect(Math.floor(nx)-U, Math.floor(ny)-U, U*2, U*2);
     });
 }
 
@@ -1012,8 +1204,12 @@ function updateHintBar() {
         if (tx<0||tx>=currentMap.w||ty<0||ty>=currentMap.h) continue;
         const tile=currentMap.tiles[ty][tx];
         if (tile===TILE.SIGN)    { hint='Press E to read'; break; }
+        if (tile===TILE.DOOR) {
+            const entrances = BUILDING_ENTRANCES[currentMap.id];
+            if (entrances?.[`${tx},${ty}`]) { hint='Walk into door to enter'; break; }
+        }
         if (tile===TILE.STAIRS)  { hint='Press E to descend'; break; }
-        if (tile===TILE.STAIRSUP){ hint='Press E to ascend'; break; }
+        if (tile===TILE.STAIRSUP){ hint=currentMap.returnMap?'Press E to exit':'Press E to ascend'; break; }
         const npc=currentMap.npcs.find(n=>n.x===tx&&n.y===ty);
         if (npc) { hint=`Press E to talk to ${npc.name}`; break; }
     }
@@ -1290,9 +1486,9 @@ function loop(ts){
 function startGame(name,charClass) {
     gs.charName=name;gs.charClass=charClass;gs.flags={};gs.inventory=[];
     currentMap=MAPS.village;
-    [...VILLAGE_NPCS,...DUNGEON_NPCS].forEach(n=>n.history=[]);
+    [...VILLAGE_NPCS,...DUNGEON_NPCS,...ELDER_NPCS,...BLACKSMITH_NPCS,...VEYLA_NPCS].forEach(n=>n.history=[]);
     MAPS.dungeon_1.items=[...DUNGEON_ITEMS.map(i=>({...i}))];
-    player.x=7;player.y=8;player.facing='down';
+    player.x=currentMap.playerStart.x;player.y=currentMap.playerStart.y;player.facing='down';
     ui.dialogue=null;ui.sign=null;ui.questLog=false;ui.loading=false;ui.paused=false;
     _pauseEl().classList.add('hidden');
     resizeCanvas();
