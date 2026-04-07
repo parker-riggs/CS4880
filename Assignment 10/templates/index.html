@@ -200,10 +200,12 @@
             <span class="hud-sep">·</span>
             <span>Q Quests</span>
             <span class="hud-sep">·</span>
+            <span>Tab Inventory</span>
+            <span class="hud-sep">·</span>
             <span>Esc Pause</span>
         </div>
         <div id="hud-right">
-            <div id="inv-bar"></div>
+            <button id="inv-btn" class="hud-btn" onclick="toggleInventory()">&#128198; Inventory</button>
             <button id="quest-btn" class="hud-btn">&#128220; Quests</button>
             <button id="music-toggle" class="hud-btn active">&#127925;</button>
             <button id="restart-btn" class="hud-btn">&#8635; New Game</button>
@@ -232,6 +234,103 @@
                 <button id="close-quest-log" class="back-btn">&#10005; Close</button>
             </div>
             <div id="quest-list"></div>
+        </div>
+    </div>
+
+    <!-- Inventory / Character Screen -->
+    <div id="inventory-screen" class="overlay hidden">
+        <div id="inv-screen-inner">
+
+            <!-- Left panel: Character -->
+            <div id="inv-char-panel">
+                <div id="inv-char-header">
+                    <div id="inv-char-portrait"></div>
+                    <div id="inv-char-info">
+                        <div id="inv-char-name">Hero</div>
+                        <div id="inv-char-class">Warrior</div>
+                    </div>
+                    <div id="inv-level-badge">Lv 1</div>
+                </div>
+
+                <div class="inv-stat-block">
+                    <div class="inv-stat-row">
+                        <span class="inv-stat-label">HP</span>
+                        <div class="inv-mini-bar"><div id="inv-hp-fill"></div></div>
+                        <span id="inv-hp-val" class="inv-stat-val">50/50</span>
+                    </div>
+                    <div class="inv-stat-row">
+                        <span class="inv-stat-label" style="color:#c8d040">XP</span>
+                        <div class="inv-mini-bar"><div id="inv-xp-fill" style="background:linear-gradient(to right,#8a9020,#c8d040)"></div></div>
+                        <span id="inv-xp-val" class="inv-stat-val">0 / 60</span>
+                    </div>
+                </div>
+
+                <div class="inv-divider"></div>
+
+                <div id="inv-stats-grid">
+                    <div class="inv-stat-entry">
+                        <div class="inv-stat-icon">⚔</div>
+                        <div class="inv-stat-body">
+                            <div class="inv-stat-key">Attack</div>
+                            <div id="inv-atk-val" class="inv-stat-num">16</div>
+                        </div>
+                    </div>
+                    <div class="inv-stat-entry">
+                        <div class="inv-stat-icon">🛡</div>
+                        <div class="inv-stat-body">
+                            <div class="inv-stat-key">Defense</div>
+                            <div id="inv-def-val" class="inv-stat-num">5</div>
+                        </div>
+                    </div>
+                    <div class="inv-stat-entry">
+                        <div class="inv-stat-icon">💨</div>
+                        <div class="inv-stat-body">
+                            <div class="inv-stat-key">Speed</div>
+                            <div id="inv-spd-val" class="inv-stat-num">Normal</div>
+                        </div>
+                    </div>
+                    <div class="inv-stat-entry">
+                        <div class="inv-stat-icon">⭐</div>
+                        <div class="inv-stat-body">
+                            <div class="inv-stat-key">Next Level</div>
+                            <div id="inv-next-val" class="inv-stat-num">60 XP</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="inv-divider"></div>
+
+                <div id="inv-equipped-section">
+                    <div class="inv-section-label">EQUIPPED</div>
+                    <div id="inv-equipped-slot">
+                        <span id="inv-equipped-icon">—</span>
+                        <span id="inv-equipped-name">Nothing equipped</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right panel: Items -->
+            <div id="inv-items-panel">
+                <div id="inv-items-header">
+                    <span>INVENTORY</span>
+                    <button id="inv-close-btn" onclick="closeInventory()">&#x2715;</button>
+                </div>
+
+                <div id="inv-grid-wrap">
+                    <div id="inv-grid"></div>
+                </div>
+
+                <div id="inv-item-detail" class="hidden">
+                    <div id="inv-detail-icon"></div>
+                    <div id="inv-detail-body">
+                        <div id="inv-detail-name"></div>
+                        <div id="inv-detail-desc"></div>
+                    </div>
+                    <button id="inv-use-btn" onclick="useSelectedItem()">Use</button>
+                </div>
+                <div id="inv-empty-msg">Your pack is empty.</div>
+            </div>
+
         </div>
     </div>
 
