@@ -1175,9 +1175,9 @@ function startGame(name,charClass) {
 }
 
 document.getElementById('begin-btn').addEventListener('click',()=>{
-    const name=document.getElementById('char-name').value.trim()||'Hero';
-    const charClass=document.querySelector('.class-card.selected')?.dataset.class||'Warrior';
-    // Small delay so the overlay fade-in completes before we swap screens
+    const name=document.getElementById('char-name').value.trim();
+    const charClass=document.querySelector('.class-card.selected')?.dataset.class;
+    if (!name || !charClass) return; // button should already be disabled; guard anyway
     setTimeout(()=>startGame(name,charClass), 340);
 });
 
@@ -1194,6 +1194,11 @@ document.getElementById('restart-btn').addEventListener('click',()=>{
             main.style.transform='translateY(0)';
             requestAnimationFrame(()=>{main.style.opacity='1';});
             menuLoop&&menuLoop();
+            // Reset character creation form
+            document.getElementById('char-name').value='';
+            document.querySelectorAll('.class-card').forEach(c=>c.classList.remove('selected'));
+            document.getElementById('begin-btn').disabled=true;
+            document.getElementById('create-error').classList.add('hidden');
             fadeOverlay('out');
         });
     } else {

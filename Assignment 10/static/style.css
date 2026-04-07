@@ -196,6 +196,16 @@ html, body {
     opacity: 0.92; transform: translateY(-1px);
     box-shadow: 0 4px 20px rgba(200,146,42,0.3);
 }
+.primary-btn:disabled {
+    opacity: 0.35; cursor: not-allowed;
+    transform: none; box-shadow: none;
+}
+
+.create-error {
+    font-size: 0.8rem; color: #c05030;
+    text-align: center; letter-spacing: 1px;
+    margin-top: 4px;
+}
 
 /* ── How to Play ───────────────────────────────── */
 .howto-grid { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }

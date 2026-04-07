@@ -51,7 +51,7 @@
         <div class="form-group">
             <label>Choose a Class</label>
             <div class="class-grid">
-                <button class="class-card selected" data-class="Warrior">
+                <button class="class-card" data-class="Warrior">
                     <div class="card-icon">&#9876;</div>
                     <div class="card-name">Warrior</div>
                     <div class="card-desc">Iron-willed fighter. Masters of blade and shield.</div>
@@ -74,7 +74,8 @@
             </div>
         </div>
 
-        <button id="begin-btn" class="primary-btn">&#9876; Enter the World</button>
+        <p id="create-error" class="create-error hidden"></p>
+        <button id="begin-btn" class="primary-btn" disabled>&#9876; Enter the World</button>
     </div>
 
     <!-- ③ How to Play -->
@@ -333,11 +334,26 @@ document.getElementById('btn-back-create').addEventListener('click', () => showP
 document.getElementById('btn-back-howto').addEventListener('click',  () => showPanel('menu-main'));
 document.getElementById('btn-back-credits').addEventListener('click',() => showPanel('menu-main'));
 
+// ── Character creation validation ────────────────────
+function validateCreate() {
+    const hasName  = document.getElementById('char-name').value.trim().length > 0;
+    const hasClass = !!document.querySelector('.class-card.selected');
+    const btn = document.getElementById('begin-btn');
+    btn.disabled = !(hasName && hasClass);
+}
+
+document.getElementById('char-name').addEventListener('input', () => {
+    document.getElementById('create-error').classList.add('hidden');
+    validateCreate();
+});
+
 // ── Class card selection ──────────────────────────────
 document.querySelectorAll('.class-card').forEach(card => {
     card.addEventListener('click', () => {
         document.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
+        document.getElementById('create-error').classList.add('hidden');
+        validateCreate();
     });
 });
 
