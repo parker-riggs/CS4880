@@ -132,27 +132,148 @@ function buildVillageTiles() {
     return m;
 }
 
-function buildDungeonTiles() {
-    const rows = 21, cols = 30;
-    const m = Array.from({length:rows}, () => new Array(cols).fill(W));
-    const fill = (x1,y1,x2,y2,t) => {
-        for (let y=y1;y<=y2;y++) for (let x=x1;x<=x2;x++) m[y][x]=t;
+// ═══════════════════════════════════════════════════════
+//  PROCEDURAL MINE GENERATOR
+//  Generates a large connected cave network using Prim's
+//  MST room connection + L-shaped mine shaft corridors.
+// ═══════════════════════════════════════════════════════
+function buildMineTiles(rng) {
+    const MW = 100, MH = 65;
+    const tiles = Array.from({length:MH}, () => new Array(MW).fill(W));
+    const rooms = [], signs = [];
+
+    // ── 1. Room placement ─────────────────────────────────
+    const TARGET = 24, TRIES = 600, PAD = 2;
+    for (let t = 0; t < TRIES && rooms.length < TARGET; t++) {
+        const rw = 5  + Math.floor(rng() * 11);   // 5–15 wide
+        const rh = 4  + Math.floor(rng() * 7);    // 4–10 tall
+        const rx = 2  + Math.floor(rng() * (MW - rw - 4));
+        const ry = 2  + Math.floor(rng() * (MH - rh - 4));
+        const bad = rooms.some(r =>
+            rx < r.x+r.w+PAD && rx+rw+PAD > r.x &&
+            ry < r.y+r.h+PAD && ry+rh+PAD > r.y);
+        if (!bad) rooms.push({x:rx,y:ry,w:rw,h:rh,
+            cx:rx+Math.floor(rw/2), cy:ry+Math.floor(rh/2)});
+    }
+
+    // Fill rooms with FLOOR
+    for (const r of rooms)
+        for (let y=r.y; y<r.y+r.h; y++)
+            for (let x=r.x; x<r.x+r.w; x++) tiles[y][x]=F;
+
+    // ── 2. Corridor carving (Prim MST + extra loops) ──────
+    const dig = (x,y) => { if(x>=1&&x<MW-1&&y>=1&&y<MH-1) tiles[y][x]=F; };
+    const carve = (x1,y1,x2,y2,wide=false) => {
+        const hf = rng()>.5;
+        const row = (y,xa,xb) => { for(let x=Math.min(xa,xb);x<=Math.max(xa,xb);x++){dig(x,y);if(wide)dig(x,y+1);} };
+        const col = (x,ya,yb) => { for(let y=Math.min(ya,yb);y<=Math.max(ya,yb);y++){dig(x,y);if(wide)dig(x+1,y);} };
+        if (hf) { row(y1,x1,x2); col(x2,y1,y2); }
+        else    { col(x1,y1,y2); row(y2,x1,x2); }
     };
-    fill(1,1,10,6,F);   // Room A (entry)
-    m[2][8] = SG;        // warning sign
-    m[3][3] = SU;        // stairs up
-    for (let y=7;y<=9;y++) m[y][5]=F;  // corridor A→B
-    fill(1,10,10,16,F);  // Room B (ghost room)
-    for (let x=11;x<=19;x++) m[13][x]=F; // bridge B→C
-    fill(20,10,28,16,F); // Room C (item room)
-    m[11][22]=SG;        // lore tablet
-    for (let y=17;y<=18;y++) m[y][5]=F; // corridor south
-    m[19][5]=ST;         // stairs down (future)
-    // Torches
-    m[1][0]=TC; m[6][0]=TC; m[1][10]=TC; m[6][10]=TC;
-    m[10][0]=TC; m[16][0]=TC; m[10][10]=TC; m[16][10]=TC;
-    m[10][20]=TC; m[16][20]=TC; m[10][28]=TC; m[16][28]=TC;
-    return m;
+
+    // Prim's algorithm — connect each room to nearest in-tree room
+    const inTree = new Set([0]);
+    while (inTree.size < rooms.length) {
+        let bDist=Infinity, bI=-1, bJ=-1;
+        for (const i of inTree) {
+            for (let j=0;j<rooms.length;j++) {
+                if (inTree.has(j)) continue;
+                const dx=rooms[i].cx-rooms[j].cx, dy=rooms[i].cy-rooms[j].cy;
+                const d=dx*dx+dy*dy;
+                if (d<bDist){bDist=d;bI=i;bJ=j;}
+            }
+        }
+        if (bJ===-1) break;
+        inTree.add(bJ);
+        carve(rooms[bI].cx,rooms[bI].cy,rooms[bJ].cx,rooms[bJ].cy, rng()<.22);
+    }
+    // Extra loops for interest (~25% extra connections)
+    for (let i=0;i<Math.floor(rooms.length*.25);i++) {
+        const a=Math.floor(rng()*rooms.length), b=Math.floor(rng()*rooms.length);
+        if (a!==b) carve(rooms[a].cx,rooms[a].cy,rooms[b].cx,rooms[b].cy);
+    }
+
+    // ── 3. Torches ────────────────────────────────────────
+    for (const r of rooms) {
+        const count = r.w>=9 ? 2 : 1;
+        for (let i=0;i<count;i++) {
+            const tx = r.x+1+Math.floor(i*(r.w-3)/Math.max(count-1,1));
+            tiles[r.y][Math.min(tx,r.x+r.w-2)] = TC;
+        }
+    }
+
+    // ── 4. Underground water pools ────────────────────────
+    let wc=0;
+    for (let ri=3; ri<rooms.length && wc<6; ri++) {
+        const r=rooms[ri];
+        if (r.w<7||r.h<5||rng()>.35) continue;
+        const wx=r.x+1+Math.floor(rng()*(r.w-4));
+        const wy=r.y+1+Math.floor(rng()*(r.h-3));
+        const ww=1+Math.floor(rng()*3), wh=1+Math.floor(rng()*2);
+        for (let py=wy;py<=Math.min(wy+wh,r.y+r.h-2);py++)
+            for (let px=wx;px<=Math.min(wx+ww,r.x+r.w-2);px++)
+                if (tiles[py][px]===F) tiles[py][px]=WA;
+        wc++;
+    }
+
+    // ── 5. Lore signs ─────────────────────────────────────
+    const LORE = [
+        'Day 12. The sounds have returned.\nHenrick says to ignore them.\nI am trying.',
+        'DANGER — SHAFT UNSTABLE\nProceed at your own risk.\n\nManagement accepts\nno liability.',
+        'The ore ran dry at depth four.\nThe miners kept digging.\nThey found something else.',
+        'If you find this note:\nWE MADE IT TO THE EAST PASSAGE.\nWe did not make it out.',
+        '— H.D. WAS HERE —\nDay 47. Still breathing.\nSomething in the dark breathes back.',
+        'DEPTH MARKER: LOWER LEVEL\nTurn-back rate: 100%\nSurvival rate: pending.',
+        'Do not answer the voice.\nIt learns your name.\nThen it uses it.',
+        'Property of the Eldoria Mining Guild\nFounded Year of the Third Moon\n[THE REST IS SCRATCHED OUT]',
+    ];
+    let li=0;
+    for (let ri=1; ri<rooms.length&&li<LORE.length; ri++) {
+        if (rng()>.45) continue;
+        const r=rooms[ri];
+        const sx=r.x+1, sy=r.y;
+        if (tiles[sy][sx]===TC||tiles[sy][sx]===SG) continue;
+        tiles[sy][sx]=SG;
+        signs.push({x:sx,y:sy,text:LORE[li++]});
+    }
+
+    // Ancient tablet (Veyla's quest) — deep room, not the exit room
+    const deepIdx = Math.min(
+        Math.floor(rooms.length*.65)+Math.floor(rng()*Math.floor(rooms.length*.30)),
+        rooms.length-1);
+    const deepR = rooms[deepIdx];
+    const tabX=deepR.x+Math.floor(deepR.w/2), tabY=deepR.y;
+    if (tiles[tabY][tabX]!==SG&&tiles[tabY][tabX]!==TC) {
+        tiles[tabY][tabX]=SG;
+        signs.push({x:tabX,y:tabY,
+            text:'— ANCIENT TABLET —\n\n[Written in Old Script, barely legible...]\n\n"Here rests the Hollow King, sealed by the Three Wardens\nin the Age Before Memory. Should the seal fracture,\ndarkness will pour forth until the realm above\nknows only endless night."\n\n[The stone is cracked. Something has been pressing from within.]',
+            questComplete:{given:'quest_sealed_truth_given',complete:'quest_sealed_truth_complete'}
+        });
+    }
+
+    // ── 6. Player start + exit stairsup ───────────────────
+    const startR = rooms[0];
+    // StairsUp at center of entry room
+    tiles[startR.cy][startR.cx] = SU;
+    // Player spawns one step south
+    const ps = { x:startR.cx, y:Math.min(startR.cy+1, startR.y+startR.h-2) };
+    if (tiles[ps.y][ps.x]!==F) tiles[ps.y][ps.x]=F;
+
+    // ── 7. Item + NPC positions ───────────────────────────
+    // Henrick's ring — farthest room from start
+    let farR=rooms[1], farD=0;
+    for (let ri=1;ri<rooms.length;ri++) {
+        const dx=rooms[ri].cx-startR.cx, dy=rooms[ri].cy-startR.cy;
+        const d=dx*dx+dy*dy;
+        if (d>farD){farD=d;farR=rooms[ri];}
+    }
+    const itemPos = { x:farR.cx, y:farR.cy };
+
+    // Mira's ghost — mid-map room
+    const ghostR = rooms[Math.floor(rooms.length*.4)];
+    const ghostPos = { x:ghostR.cx, y:ghostR.cy };
+
+    return { tiles, w:MW, h:MH, playerStart:ps, signs, itemPos, ghostPos };
 }
 
 function buildEldersHallInterior() {
@@ -325,12 +446,7 @@ const DUNGEON_NPCS = [
       role:'The ghost of Mira, a young woman who died in the Cursed Mines three months ago. She is confused and fragmented, unable to fully remember what happened. She knows Henrick — he survived longer than the others and made it to the eastern passage before succumbing. She felt the presence of something cold and immense in the deep. She can guide the player east toward where Henrick fell.' },
 ];
 
-const DUNGEON_SIGNS = [
-    { x:8, y:2, text:'ENTRY CHAMBER\n\nYou are not the first to descend.\nYou may be the last to leave.\n\n— Etched by an unknown hand' },
-    { x:22, y:11,
-      text:'— ANCIENT TABLET —\n\n[Written in Old Script, barely legible...]\n\n"Here rests the Hollow King, sealed by the Three Wardens\nin the Age Before Memory. Should the seal fracture,\ndarkness will pour forth until the realm above\nknows only endless night."\n\n[The stone is cracked. Something has been pressing from within.]',
-      questComplete: { given:'quest_sealed_truth_given', complete:'quest_sealed_truth_complete' } },
-];
+// Dungeon signs are generated procedurally by buildMineTiles()
 
 const DUNGEON_ITEMS = [
     { id:'henrick_ring', name:"Henrick's Ring", x:25, y:13, color:'#e8c050', icon:'💍',
@@ -354,13 +470,13 @@ const MAPS = {
         dark:false,
     },
     dungeon_1: {
-        id:'dungeon_1', w:30, h:21,
-        tiles: buildDungeonTiles(),
+        id:'dungeon_1', w:100, h:65,
+        tiles: [],          // populated by rebuildDungeon()
         npcs:  DUNGEON_NPCS,
-        signs: DUNGEON_SIGNS,
-        items: DUNGEON_ITEMS,
-        playerStart:{x:4,y:4},
-        name:'Cursed Mines — Floor 1',
+        signs: [],          // populated by rebuildDungeon()
+        items: [],          // populated by rebuildDungeon()
+        playerStart:{x:5,y:5}, // populated by rebuildDungeon()
+        name:'Cursed Mines',
         dark:true,
     },
     int_elder: {
@@ -439,7 +555,7 @@ const MAPS = {
         playerStart:{x:5, y:8},
         name:'Chapel of the Old Gods',
         dark:false,
-        returnMap:'village', returnX:30, returnY:30,
+        returnMap:'village', returnX:30, returnY:28,
     },
     int_veyla: {
         id:'int_veyla', w:12, h:10,
@@ -450,9 +566,25 @@ const MAPS = {
         playerStart:{x:5, y:6},
         name:"Veyla's Study",
         dark:false,
-        returnMap:'village', returnX:41, returnY:20,
+        returnMap:'village', returnX:41, returnY:18,
     },
 };
+
+// ── Rebuild dungeon with fresh procedural generation ────
+function rebuildDungeon() {
+    const seed = Math.floor(Math.random() * 0xFFFFFF);
+    const data = buildMineTiles(_rng(seed));
+    const d = MAPS.dungeon_1;
+    d.tiles = data.tiles;
+    d.w = data.w; d.h = data.h;
+    d.playerStart = data.playerStart;
+    d.signs = data.signs;
+    d.items = [{ ...DUNGEON_ITEMS[0], x:data.itemPos.x, y:data.itemPos.y }];
+    DUNGEON_NPCS[0].x = data.ghostPos.x;
+    DUNGEON_NPCS[0].y = data.ghostPos.y;
+    DUNGEON_NPCS[0].history = [];
+}
+rebuildDungeon(); // initial build so tiles array is never empty
 
 // ═══════════════════════════════════════════════════════
 //  BUILDING ENTRANCE LOOKUP
@@ -2247,7 +2379,7 @@ function startGame(name,charClass) {
     currentMap=MAPS.village;
     [...VILLAGE_NPCS,...GUIDE_NPCS,...DUNGEON_NPCS,...ELDER_NPCS,...BLACKSMITH_NPCS,...VEYLA_NPCS].forEach(n=>n.history=[]);
     MAPS.village.items=[];
-    MAPS.dungeon_1.items=[...DUNGEON_ITEMS.map(i=>({...i}))];
+    rebuildDungeon(); // fresh procedurally generated mine every new game
     placeStarterWeapon(charClass);
     player.x=currentMap.playerStart.x; player.y=currentMap.playerStart.y; player.facing='down';
     player.renderX=player.x*TS; player.renderY=player.y*TS;

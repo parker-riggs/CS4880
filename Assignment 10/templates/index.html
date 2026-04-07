@@ -650,8 +650,8 @@ document.addEventListener('pointerdown', _bootAudio);
 document.addEventListener('touchstart',  _bootAudio, { passive: true });
 document.addEventListener('keydown',     _bootAudio);
 
-// Attach hover/click SFX to all interactive menu elements
-document.querySelectorAll('.menu-btn, .back-btn, .primary-btn, .class-card').forEach(el => {
+// Attach hover/click SFX only to start-screen elements (not in-game buttons that share classes)
+document.querySelectorAll('#start-screen .menu-btn, #start-screen .back-btn, #start-screen .primary-btn, #start-screen .class-card').forEach(el => {
     el.addEventListener('mouseenter', () => { initMenuAudio(); playHover(); });
     el.addEventListener('click',      () => { initMenuAudio(); playClick(); });
 });
