@@ -404,8 +404,22 @@ function drawTile(tile, px, py, tx, ty) {
         case TILE.DOOR:     drawDoor(px,py);             break;
         case TILE.STAIRS:   drawStairs(px,py);           break;
         case TILE.STAIRSUP: drawStairsUp(px,py);        break;
-        case TILE.SIGN:     dark?drawFloor(px,py,true):drawGrass(px,py,tx,ty);
-                            drawSignPost(px,py);         break;
+        case TILE.SIGN: {
+            // Match background to surrounding tiles so the sign blends in
+            if (dark) {
+                drawFloor(px,py,true);
+            } else {
+                const nb = [
+                    currentMap.tiles[ty]?.[tx-1], currentMap.tiles[ty]?.[tx+1],
+                    currentMap.tiles[ty-1]?.[tx],  currentMap.tiles[ty+1]?.[tx],
+                ];
+                if      (nb.some(t=>t===TILE.FLOOR)) drawFloor(px,py,false);
+                else if (nb.some(t=>t===TILE.PATH))  drawPath(px,py,tx,ty);
+                else                                  drawGrass(px,py,tx,ty);
+            }
+            drawSignPost(px,py);
+            break;
+        }
         case TILE.TORCH:    drawTorch(px,py);            break;
         default: ctx.fillStyle='#000'; ctx.fillRect(px,py,TS,TS);
     }
@@ -507,25 +521,85 @@ function drawWall(px, py, dark) {
 }
 
 function drawTree(px, py, tx, ty) {
-    const s=tx*5+ty*9;
-    ctx.fillStyle='#0d1804'; ctx.fillRect(px,py,TS,TS);
-    ctx.fillStyle='#3a2010'; ctx.fillRect(px+TS*.43,py+TS*.52,TS*.14,TS*.48);
-    ctx.fillStyle='#4a2a18'; ctx.fillRect(px+TS*.43,py+TS*.52,TS*.04,TS*.48);
-    ctx.fillStyle='#3a2010'; ctx.fillRect(px+TS*.30,py+TS*.88,TS*.40,TS*.12);
-    const layers=[{cy:.58,r:.38},{cy:.40,r:.30},{cy:.24,r:.20}];
-    const baseC=['#1a4808','#22600e','#2a7014'];
-    const hiC  =['#1e5c0a','#286a12','#347a1a'];
-    layers.forEach((l,i) => {
-        const lcx=px+TS*.5, lcy=py+TS*l.cy, lr=TS*l.r;
-        for (let b=0;b<3;b++) {
-            const a=(b/3)*Math.PI*2+(s*.4+i);
-            ctx.fillStyle=baseC[i];
-            ctx.beginPath(); ctx.arc(lcx+Math.cos(a)*lr*.65,lcy+Math.sin(a)*lr*.45,lr*.52,0,Math.PI*2); ctx.fill();
-        }
-        ctx.fillStyle=baseC[i]; ctx.beginPath(); ctx.arc(lcx,lcy,lr,0,Math.PI*2); ctx.fill();
-        ctx.fillStyle=hiC[i]; ctx.beginPath(); ctx.arc(lcx-lr*.22,lcy-lr*.22,lr*.62,0,Math.PI*2); ctx.fill();
-        ctx.fillStyle='rgba(140,210,70,0.18)'; ctx.beginPath(); ctx.arc(lcx-lr*.28,lcy-lr*.32,lr*.28,0,Math.PI*2); ctx.fill();
+    const s = tx*5 + ty*9;
+
+    // 1. Grass ground — tree sits naturally on terrain
+    drawGrass(px, py, tx, ty);
+
+    // 2. Canopy shadow cast on the ground beneath
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(px+TS*.52, py+TS*.68, TS*.36, TS*.13, 0.15, 0, Math.PI*2);
+    ctx.fill();
+
+    // 3. Exposed surface roots radiating outward
+    ctx.strokeStyle = '#3a2010'; ctx.lineWidth = TS*.045; ctx.lineCap = 'round';
+    const rootAngles = [Math.PI*.15, Math.PI*.5, Math.PI*.85, Math.PI*1.2, Math.PI*1.6];
+    rootAngles.forEach((a, i) => {
+        const a2 = a + ((s + i*17) % 7) * 0.08;
+        ctx.beginPath();
+        ctx.moveTo(px+TS*.50, py+TS*.65);
+        ctx.quadraticCurveTo(
+            px+TS*.50 + Math.cos(a2)*TS*.18, py+TS*.65 + Math.sin(a2)*TS*.09,
+            px+TS*.50 + Math.cos(a2)*TS*.30, py+TS*.65 + Math.sin(a2)*TS*.14
+        );
+        ctx.stroke();
     });
+
+    // 4. Trunk — tapered, gradient-shaded
+    const tg = ctx.createLinearGradient(px+TS*.42, 0, px+TS*.58, 0);
+    tg.addColorStop(0, '#4a2808'); tg.addColorStop(0.35, '#6e3e14'); tg.addColorStop(1, '#3a1e08');
+    ctx.fillStyle = tg;
+    ctx.beginPath();
+    ctx.moveTo(px+TS*.57, py+TS*.66);
+    ctx.lineTo(px+TS*.54, py+TS*.44);
+    ctx.lineTo(px+TS*.46, py+TS*.44);
+    ctx.lineTo(px+TS*.43, py+TS*.66);
+    ctx.closePath(); ctx.fill();
+    // Trunk bark highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.09)';
+    ctx.fillRect(px+TS*.46, py+TS*.44, TS*.04, TS*.22);
+    // Bark shadow line
+    ctx.fillStyle = 'rgba(0,0,0,0.20)';
+    ctx.fillRect(px+TS*.54, py+TS*.44, TS*.03, TS*.22);
+
+    // 5. Canopy — three layers, bottom to top
+    const layers = [{cy:.50, r:.40}, {cy:.34, r:.31}, {cy:.20, r:.22}];
+    const baseC  = ['#1a4a08','#20600e','#287014'];
+    const hiC    = ['#226012','#2a741a','#348220'];
+    layers.forEach((l, i) => {
+        const cx = px+TS*.5, cy = py+TS*l.cy, r = TS*l.r;
+        // Dark shadow side (bottom-right of each layer)
+        ctx.fillStyle = `rgba(0,0,0,${0.18 - i*.03})`;
+        ctx.beginPath(); ctx.arc(cx+r*.25, cy+r*.25, r*.88, 0, Math.PI*2); ctx.fill();
+        // Cluster bumps around perimeter
+        for (let b = 0; b < 5; b++) {
+            const a = (b/5)*Math.PI*2 + s*.31 + i*.7;
+            ctx.fillStyle = baseC[i];
+            ctx.beginPath();
+            ctx.arc(cx+Math.cos(a)*r*.62, cy+Math.sin(a)*r*.48, r*.48, 0, Math.PI*2);
+            ctx.fill();
+        }
+        // Main circle
+        ctx.fillStyle = baseC[i];
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+        // Light side highlight
+        ctx.fillStyle = hiC[i];
+        ctx.beginPath(); ctx.arc(cx-r*.18, cy-r*.18, r*.68, 0, Math.PI*2); ctx.fill();
+        // Bright specular spot (sunlight)
+        ctx.fillStyle = 'rgba(160,240,80,0.15)';
+        ctx.beginPath(); ctx.arc(cx-r*.30, cy-r*.32, r*.26, 0, Math.PI*2); ctx.fill();
+    });
+
+    // 6. Stray leaf clusters draping over the ground edge of the canopy
+    ctx.fillStyle = 'rgba(26,70,8,0.75)';
+    for (let i = 0; i < 6; i++) {
+        const a = (i/6)*Math.PI*2 + s*.19;
+        const lr = TS*.40;
+        ctx.beginPath();
+        ctx.arc(px+TS*.5+Math.cos(a)*lr*.88, py+TS*.50+Math.sin(a)*lr*.55, TS*.07, 0, Math.PI*2);
+        ctx.fill();
+    }
 }
 
 function drawWater(px, py) {
@@ -606,15 +680,75 @@ function drawStairsUp(px, py) {
 }
 
 function drawSignPost(px, py) {
-    ctx.fillStyle='#523208'; ctx.fillRect(px+TS*.44,py+TS*.36,TS*.12,TS*.64);
-    ctx.fillStyle='#623a10'; ctx.fillRect(px+TS*.44,py+TS*.36,TS*.03,TS*.64);
-    ctx.fillStyle='#8a5820'; ctx.fillRect(px+TS*.10,py+TS*.05,TS*.80,TS*.34);
-    ctx.fillStyle='#9a6828'; ctx.fillRect(px+TS*.10,py+TS*.05,TS*.80,3);
-    ctx.fillRect(px+TS*.10,py+TS*.05,3,TS*.34);
-    ctx.fillStyle='#5a3808'; ctx.fillRect(px+TS*.10,py+TS*.05+TS*.34-3,TS*.80,3);
-    ctx.fillRect(px+TS*.10+TS*.80-3,py+TS*.05,3,TS*.34);
-    ctx.fillStyle='#3a1a00';
-    for (let i=0;i<2;i++) ctx.fillRect(px+TS*.18,py+TS*(.12+i*.11),TS*.64,2.5);
+    // ── Post ─────────────────────────────────────────────
+    const postGrad = ctx.createLinearGradient(px+TS*.43, 0, px+TS*.58, 0);
+    postGrad.addColorStop(0,   '#4a2808');
+    postGrad.addColorStop(0.3, '#7a4418');
+    postGrad.addColorStop(1,   '#3a1e08');
+    ctx.fillStyle = postGrad;
+    ctx.fillRect(px+TS*.44, py+TS*.32, TS*.12, TS*.68);
+    // Post highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.fillRect(px+TS*.45, py+TS*.32, TS*.025, TS*.68);
+    // Post shadow line
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillRect(px+TS*.54, py+TS*.32, TS*.02, TS*.68);
+    // Bark grain
+    ctx.strokeStyle = 'rgba(0,0,0,0.14)'; ctx.lineWidth = 0.8;
+    for (let i=0; i<3; i++) {
+        const gx = px+TS*.46 + i*TS*.025;
+        ctx.beginPath(); ctx.moveTo(gx, py+TS*.35); ctx.lineTo(gx+0.5, py+TS); ctx.stroke();
+    }
+
+    // ── Board drop-shadow ──────────────────────────────────
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    const bx=px+TS*.08, by=py+TS*.04, bw=TS*.84, bh=TS*.30, r=TS*.05;
+    ctx.beginPath(); ctx.roundRect(bx+2, by+3, bw, bh, r); ctx.fill();
+
+    // ── Board body ─────────────────────────────────────────
+    const boardGrad = ctx.createLinearGradient(px, py+TS*.04, px, py+TS*.34);
+    boardGrad.addColorStop(0, '#b07028');
+    boardGrad.addColorStop(0.6, '#8a5018');
+    boardGrad.addColorStop(1, '#6a3a0c');
+    ctx.fillStyle = boardGrad;
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, r); ctx.fill();
+
+    // Board border
+    ctx.strokeStyle = '#4a2808'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, r); ctx.stroke();
+
+    // Board top highlight bevel
+    ctx.fillStyle = 'rgba(255,255,255,0.13)';
+    ctx.beginPath(); ctx.roundRect(bx+1, by+1, bw-2, bh*.28, r*.7); ctx.fill();
+
+    // Wood grain lines on board
+    ctx.strokeStyle = 'rgba(0,0,0,0.10)'; ctx.lineWidth = 0.9;
+    for (let i=0; i<3; i++) {
+        const gy = by + bh*.22 + i*(bh*.22);
+        ctx.beginPath(); ctx.moveTo(bx+r, gy); ctx.lineTo(bx+bw-r, gy+0.8); ctx.stroke();
+    }
+
+    // Carved text lines (recessed look)
+    ctx.fillStyle = 'rgba(50,20,5,0.70)';
+    const lm = bx + bw*.14, lw = bw*.72;
+    ctx.fillRect(lm,      by+bh*.22, lw,       2);
+    ctx.fillRect(lm,      by+bh*.46, lw,       2);
+    ctx.fillRect(lm,      by+bh*.68, lw*.55,   2);
+    // Carved highlight (gives depth)
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(lm,      by+bh*.22+2, lw,     1);
+    ctx.fillRect(lm,      by+bh*.46+2, lw,     1);
+    ctx.fillRect(lm,      by+bh*.68+2, lw*.55, 1);
+
+    // Small nail heads at board corners
+    ctx.fillStyle = '#2a1a08';
+    [[bx+bw*.12, by+bh*.18],[bx+bw*.88, by+bh*.18],
+     [bx+bw*.12, by+bh*.80],[bx+bw*.88, by+bh*.80]].forEach(([nx,ny]) => {
+        ctx.beginPath(); ctx.arc(nx, ny, TS*.025, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.18)';
+        ctx.beginPath(); ctx.arc(nx-1, ny-1, TS*.010, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#2a1a08';
+    });
 }
 
 function drawTorch(px, py) {
