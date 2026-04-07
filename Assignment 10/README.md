@@ -2,6 +2,12 @@
 
 A browser-based AI-powered RPG built with Flask, HTML5 Canvas, and the Groq LLM API.
 
+## Play Now
+
+**[https://cs4880.onrender.com](https://cs4880.onrender.com)**
+
+> First load may take ~30 seconds if the server has been idle.
+
 ---
 
 ## Running the Game
