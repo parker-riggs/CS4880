@@ -25,6 +25,9 @@
             <button class="menu-btn" id="btn-new-game">
                 <span class="btn-icon">&#9876;</span> New Game
             </button>
+            <button class="menu-btn" id="btn-options">
+                <span class="btn-icon">&#9881;</span> Options
+            </button>
             <button class="menu-btn" id="btn-how-to-play">
                 <span class="btn-icon">&#128214;</span> How to Play
             </button>
@@ -78,7 +81,35 @@
         <button id="begin-btn" class="primary-btn" disabled>&#9876; Enter the World</button>
     </div>
 
-    <!-- ③ How to Play -->
+    <!-- ③ Options -->
+    <div id="menu-options" class="menu-panel hidden">
+        <div class="panel-header">
+            <button class="back-btn" id="btn-back-options">&#8592; Back</button>
+            <h2>Options</h2>
+        </div>
+        <div class="create-rule"></div>
+
+        <div class="opts-section">
+            <div class="opts-section-label">&#9834; Audio</div>
+            <div class="opts-row">
+                <label for="opt-vol">Music Volume</label>
+                <div class="opts-slider-wrap">
+                    <input type="range" id="opt-vol" class="opt-slider" min="0" max="100" value="50">
+                    <span id="opt-vol-pct" class="opts-pct">50%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="opts-section">
+            <div class="opts-section-label">&#9716; Video</div>
+            <div class="opts-row opts-row-btn">
+                <label>Display Mode</label>
+                <button id="opt-fullscreen" class="opts-toggle">&#9974; Enter Fullscreen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ④ How to Play -->
     <div id="menu-howto" class="menu-panel hidden">
         <div class="panel-header">
             <button class="back-btn" id="btn-back-howto">&#8592; Back</button>
@@ -213,6 +244,7 @@
                 <input type="range" id="pause-vol" min="0" max="100" value="50">
             </div>
             <button id="pause-resume" class="pause-btn primary">▶ Resume</button>
+            <button id="pause-fullscreen" class="pause-btn">⛶ Fullscreen</button>
             <button id="pause-mainmenu" class="pause-btn">⌂ Main Menu</button>
         </div>
     </div>
@@ -328,11 +360,55 @@ function showPanel(id) {
 showPanel('menu-main');
 
 document.getElementById('btn-new-game').addEventListener('click',    () => showPanel('menu-create'));
+document.getElementById('btn-options').addEventListener('click',     () => showPanel('menu-options'));
 document.getElementById('btn-how-to-play').addEventListener('click', () => showPanel('menu-howto'));
 document.getElementById('btn-credits').addEventListener('click',     () => showPanel('menu-credits'));
 document.getElementById('btn-back-create').addEventListener('click', () => showPanel('menu-main'));
+document.getElementById('btn-back-options').addEventListener('click',() => showPanel('menu-main'));
 document.getElementById('btn-back-howto').addEventListener('click',  () => showPanel('menu-main'));
 document.getElementById('btn-back-credits').addEventListener('click',() => showPanel('menu-main'));
+
+// ── Options panel logic ───────────────────────────────
+// Shared volume preference (read by game.js on startMusic)
+window.gameVolumePct = 50;
+
+function syncVolSliders(pct) {
+    window.gameVolumePct = pct;
+    // Apply to live audio if game is running
+    if (typeof masterGain !== 'undefined' && masterGain) {
+        masterGain.gain.value = (pct / 100) * 0.25;
+    }
+    // Keep both sliders in sync
+    const optVol   = document.getElementById('opt-vol');
+    const pauseVol = document.getElementById('pause-vol');
+    if (optVol)   { optVol.value = pct;   optVol.style.setProperty('--pct', pct + '%'); }
+    if (pauseVol) { pauseVol.value = pct; pauseVol.style.setProperty('--pct', pct + '%'); }
+    const pctLabel = document.getElementById('opt-vol-pct');
+    if (pctLabel) pctLabel.textContent = pct + '%';
+}
+
+// Init slider fill on load
+(function() {
+    const s = document.getElementById('opt-vol');
+    s.style.setProperty('--pct', s.value + '%');
+})();
+
+document.getElementById('opt-vol').addEventListener('input', function() {
+    syncVolSliders(+this.value);
+});
+
+function updateOptFullscreenLabel() {
+    const btn = document.getElementById('opt-fullscreen');
+    if (btn) btn.textContent = document.fullscreenElement ? '\u2715 Exit Fullscreen' : '\u29fc Enter Fullscreen';
+}
+document.getElementById('opt-fullscreen').addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+        document.exitFullscreen().catch(() => {});
+    }
+});
+document.addEventListener('fullscreenchange', updateOptFullscreenLabel);
 
 // ── Character creation validation ────────────────────
 function validateCreate() {

@@ -233,6 +233,60 @@ html, body {
 }
 .howto-tip strong { color: #c8922a; }
 
+/* ── Options ───────────────────────────────────── */
+.opts-section {
+    width: 100%; display: flex; flex-direction: column; gap: 14px;
+    padding: 16px 0; border-bottom: 1px solid #1e1208;
+}
+.opts-section:last-child { border-bottom: none; }
+
+.opts-section-label {
+    font-family: 'Cinzel', serif; font-size: 0.72rem;
+    color: #c8922a; letter-spacing: 3px; text-transform: uppercase;
+}
+
+.opts-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 20px;
+}
+.opts-row label {
+    font-size: 0.88rem; color: #a08060; flex-shrink: 0;
+}
+
+.opts-slider-wrap {
+    display: flex; align-items: center; gap: 12px; flex: 1;
+}
+.opt-slider {
+    flex: 1; appearance: none;
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, #c8a060 var(--pct,50%), #2a2030 var(--pct,50%));
+    outline: none; cursor: pointer;
+}
+.opt-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #c8a060;
+    box-shadow: 0 0 6px rgba(200,160,80,0.6);
+    cursor: pointer;
+}
+.opts-pct {
+    font-family: 'Cinzel', serif; font-size: 0.75rem;
+    color: #c8922a; min-width: 38px; text-align: right;
+}
+
+.opts-toggle {
+    padding: 8px 18px;
+    background: transparent;
+    border: 1px solid #3a2a4a; border-radius: 4px;
+    color: #a09080; font-family: 'Cinzel', serif;
+    font-size: 0.82rem; letter-spacing: 2px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.opts-toggle:hover {
+    background: rgba(80,50,120,0.3);
+    border-color: #6a4a90; color: #d4b896;
+}
+
 /* ── Credits ───────────────────────────────────── */
 .credits-block { display: flex; flex-direction: column; gap: 0; }
 .credits-section { padding: 16px 0; text-align: center; }

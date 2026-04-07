@@ -1398,7 +1398,7 @@ const SCALE_DUNGEON=[110,116.54,130.81,138.59,164.81,174.61,185,220,233.08,261.6
 function startMusic() {
     if(audioCtx)return;
     audioCtx=new(window.AudioContext||window['webkitAudioContext'])();
-    masterGain=audioCtx.createGain();masterGain.gain.value=0.25;
+    masterGain=audioCtx.createGain();masterGain.gain.value=((window.gameVolumePct??50)/100)*0.25;
     const delay=audioCtx.createDelay(3);delay.delayTime.value=0.45;
     const fb=audioCtx.createGain();fb.gain.value=0.42;
     const lpf=audioCtx.createBiquadFilter();lpf.type='lowpass';lpf.frequency.value=1800;
@@ -1437,8 +1437,8 @@ function openPause() {
     if (document.getElementById('game-screen').classList.contains('hidden')) return;
     ui.paused = true;
     if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
-    // Sync slider to current master volume
-    const vol = masterGain ? Math.round(masterGain.gain.value / 0.25 * 50) : 50;
+    // Sync pause slider to shared volume preference
+    const vol = window.gameVolumePct ?? 50;
     const slider = _pauseVol();
     slider.value = Math.min(100, Math.max(0, vol));
     _updateSliderFill(slider);
@@ -1455,14 +1455,40 @@ function _updateSliderFill(slider) {
     slider.style.setProperty('--pct', slider.value + '%');
 }
 
-// Wire up slider
+// Wire up pause slider — delegates to syncVolSliders so menu slider stays in sync too
 document.getElementById('pause-vol').addEventListener('input', function() {
     _updateSliderFill(this);
-    if (masterGain) masterGain.gain.value = (this.value / 100) * 0.25;
+    if (typeof syncVolSliders === 'function') syncVolSliders(+this.value);
+    else if (masterGain) masterGain.gain.value = (this.value / 100) * 0.25;
 });
 
 // Resume button
 document.getElementById('pause-resume').addEventListener('click', closePause);
+
+// Fullscreen button
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+        document.exitFullscreen().catch(() => {});
+    }
+}
+
+function updateFullscreenLabel() {
+    const inFS = !!document.fullscreenElement;
+    const pauseBtn = document.getElementById('pause-fullscreen');
+    if (pauseBtn) pauseBtn.textContent = inFS ? '✕ Exit Fullscreen' : '⛶ Fullscreen';
+    // also update the main menu options button if it exists
+    if (typeof window['updateOptFullscreenLabel'] === 'function') window['updateOptFullscreenLabel']();
+}
+
+document.getElementById('pause-fullscreen').addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', updateFullscreenLabel);
+
+// F11 shortcut toggles fullscreen from anywhere in-game
+document.addEventListener('keydown', e => {
+    if (e.key === 'F11') { e.preventDefault(); toggleFullscreen(); }
+}, true);
 
 // Main Menu button (reuses the restart flow)
 document.getElementById('pause-mainmenu').addEventListener('click', () => {
