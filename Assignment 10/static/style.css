@@ -343,6 +343,19 @@ html, body {
     font-family: 'Cinzel', serif; font-size: 0.85rem; color: #d4b896;
 }
 .hud-sep { color: #4a3020; }
+.hud-hp-label { font-size: 0.72rem; color: #9a3030; font-weight: bold; letter-spacing: 1px; }
+#hp-bar {
+    width: 80px; height: 10px;
+    background: #1a0808; border: 1px solid #4a1a1a; border-radius: 3px;
+    overflow: hidden; flex-shrink: 0;
+}
+#hp-fill {
+    height: 100%; width: 100%;
+    background: linear-gradient(to right, #c02020, #e04040);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+#hp-text { font-size: 0.72rem; color: #c07070; min-width: 40px; }
 
 #hud-center {
     flex: 1; text-align: center;

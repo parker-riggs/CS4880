@@ -12,6 +12,24 @@ const WALKABLE = new Set([
     TILE.GRASS, TILE.PATH, TILE.FLOOR,
     TILE.DOOR, TILE.STAIRS, TILE.STAIRSUP,
 ]);
+
+// ═══════════════════════════════════════════════════════
+//  ENEMY DEFINITIONS
+// ═══════════════════════════════════════════════════════
+const ENEMY_DEFS = {
+    shade: {
+        name:'Shade', hp:22, atk:8, xp:15,
+        speed:1100, aggroRange:7, aggroSpeed:420,
+        color:'#4010a0', eyeColor:'#ff1020',
+        desc:'A wraith of living shadow.',
+    },
+    lurker: {
+        name:'Cave Lurker', hp:55, atk:18, xp:35,
+        speed:1900, aggroRange:3, aggroSpeed:1000,
+        color:'#5a4030', eyeColor:'#ff8010',
+        desc:'A massive stone-skinned predator.',
+    },
+};
 const { GRASS:G, PATH:P, FLOOR:F, WALL:W, TREE:TR,
         WATER:WA, DOOR:DR, STAIRS:ST, SIGN:SG,
         STAIRSUP:SU, TORCH:TC } = TILE;
@@ -273,7 +291,22 @@ function buildMineTiles(rng) {
     const ghostR = rooms[Math.floor(rooms.length*.4)];
     const ghostPos = { x:ghostR.cx, y:ghostR.cy };
 
-    return { tiles, w:MW, h:MH, playerStart:ps, signs, itemPos, ghostPos };
+    // ── 8. Enemy spawns ──────────────────────────────────
+    // Skip room 0 (entry), ghost room, and item room to avoid overcrowding
+    const enemySpawns = [];
+    const skipRooms = new Set([0, Math.floor(rooms.length*.4), deepIdx]);
+    for (let ri = 1; ri < rooms.length; ri++) {
+        if (skipRooms.has(ri)) continue;
+        const r = rooms[ri];
+        // Lurker every 5 rooms (slow, tanky), Shade every other room (fast, weak)
+        if (ri % 5 === 2) {
+            enemySpawns.push({ type:'lurker', x:r.cx, y:r.cy });
+        } else if (ri % 2 === 1) {
+            enemySpawns.push({ type:'shade', x:r.cx, y:r.cy });
+        }
+    }
+
+    return { tiles, w:MW, h:MH, playerStart:ps, signs, itemPos, ghostPos, enemySpawns };
 }
 
 function buildEldersHallInterior() {
@@ -475,6 +508,7 @@ const MAPS = {
         npcs:  DUNGEON_NPCS,
         signs: [],          // populated by rebuildDungeon()
         items: [],          // populated by rebuildDungeon()
+        enemies: [],        // populated by rebuildDungeon()
         playerStart:{x:5,y:5}, // populated by rebuildDungeon()
         name:'Cursed Mines',
         dark:true,
@@ -583,6 +617,16 @@ function rebuildDungeon() {
     DUNGEON_NPCS[0].x = data.ghostPos.x;
     DUNGEON_NPCS[0].y = data.ghostPos.y;
     DUNGEON_NPCS[0].history = [];
+    d.enemies = data.enemySpawns.map((sp, i) => ({
+        ...ENEMY_DEFS[sp.type],
+        id: `enemy_${i}`,
+        type: sp.type,
+        x: sp.x, y: sp.y,
+        hp: ENEMY_DEFS[sp.type].hp,
+        moveTimer: 300 + Math.floor(Math.random() * 700),
+        aggroed: false,
+        alive: true,
+    }));
 }
 rebuildDungeon(); // initial build so tiles array is never empty
 
@@ -634,8 +678,21 @@ const QUEST_GIVER_FLAGS = {
 // ═══════════════════════════════════════════════════════
 //  GAME STATE
 // ═══════════════════════════════════════════════════════
-const gs = { charName:'Hero', charClass:'Warrior', flags:{}, inventory:[] };
+const gs = { charName:'Hero', charClass:'Warrior', flags:{}, inventory:[], hp:50, maxHp:50 };
 let currentMap = MAPS.village;
+
+// ── Battle state ──────────────────────────────────────
+const battle = {
+    active: false,
+    enemy: null,
+    phase: 'player_timing', // 'player_timing'|'player_result'|'enemy_turn'|'enemy_result'|'victory'|'defeat'
+    timer: 0,
+    cursorPos: 0.5,  // 0–1, position of timing cursor
+    cursorDir: 1,
+    hitResult: '',   // 'CRITICAL!'|'HIT!'|'WEAK!'|'MISS!'
+    hitDmg: 0,
+    playerDmgTaken: 0,
+};
 
 const player  = {
     x:7, y:8, facing:'down',
@@ -679,6 +736,7 @@ document.addEventListener('keydown', e => {
     if (nav.includes(e.key)) e.preventDefault();
     if (!KEYS.has(e.key)) JUST_PRESSED.add(e.key);
     KEYS.add(e.key);
+    if (e.key === ' ' && battle.active) { e.preventDefault(); resolvePlayerAttack(); return; }
     if (e.key === 'e' || e.key === 'E') { e.preventDefault(); handleInteract(); }
     if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); toggleQuestLog(); }
     if (e.key === 'Escape') {
@@ -695,7 +753,7 @@ document.addEventListener('keydown', e => {
 let moveAccum = 999;
 
 function updateMovement(dt) {
-    if (ui.dialogue || ui.sign || ui.questLog || ui.loading || ui.paused) { JUST_PRESSED.clear(); return; }
+    if (battle.active || ui.dialogue || ui.sign || ui.questLog || ui.loading || ui.paused) { JUST_PRESSED.clear(); return; }
     const dirs = [
         { keys:['ArrowUp','w','W'],    dx:0,  dy:-1, f:'up'    },
         { keys:['ArrowDown','s','S'],  dx:0,  dy:1,  f:'down'  },
@@ -1929,6 +1987,495 @@ function renderLighting() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  ENEMY AI
+// ═══════════════════════════════════════════════════════
+function updateEnemies(dt) {
+    if (battle.active || ui.dialogue || ui.sign || ui.paused || ui.loading) return;
+    if (!currentMap.enemies) return;
+    for (const en of currentMap.enemies) {
+        if (!en.alive) continue;
+        en.moveTimer -= dt;
+        if (en.moveTimer > 0) continue;
+
+        const dx = player.x - en.x, dy = player.y - en.y;
+        const dist = Math.abs(dx) + Math.abs(dy);
+
+        // Aggro check
+        en.aggroed = dist <= en.aggroRange;
+        en.moveTimer = en.aggroed ? en.aggroSpeed : en.speed;
+
+        if (!en.aggroed) continue;
+
+        // Adjacent to player → start battle
+        if (dist <= 1) { startBattle(en); return; }
+
+        // Move one step toward player
+        let mx = 0, my = 0;
+        if (Math.abs(dx) >= Math.abs(dy)) mx = dx > 0 ? 1 : -1;
+        else my = dy > 0 ? 1 : -1;
+        const nx2 = en.x + mx, ny2 = en.y + my;
+        if (nx2 >= 0 && nx2 < currentMap.w && ny2 >= 0 && ny2 < currentMap.h) {
+            const tile = currentMap.tiles[ny2][nx2];
+            const blocked = currentMap.enemies.some(e => e !== en && e.alive && e.x === nx2 && e.y === ny2);
+            if (WALKABLE.has(tile) && !blocked) { en.x = nx2; en.y = ny2; }
+        }
+    }
+}
+
+function drawEnemyOverworld(sx, sy, en) {
+    const cx = sx + TS/2, cy = sy + TS/2, r = TS * 0.3;
+    const t = timeMs / 1000;
+    // Aggro indicator: red glow pulsing when aggroed
+    if (en.aggroed) {
+        ctx.save();
+        ctx.shadowColor = '#ff0000';
+        ctx.shadowBlur = 12 + 6 * Math.sin(t * 6);
+    }
+    ctx.save();
+    if (en.type === 'shade') {
+        // Wispy cloud body — three overlapping dark circles
+        const fl = Math.sin(t * 3.1 + en.x) * 2;
+        ctx.globalAlpha = 0.88 + 0.12 * Math.sin(t * 2.2);
+        ctx.fillStyle = '#1a0838';
+        ctx.beginPath(); ctx.arc(cx, cy + fl, r * 1.1, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#2a0860';
+        ctx.beginPath(); ctx.arc(cx - r*.3, cy - r*.2 + fl, r * .9, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + r*.3, cy + r*.1 + fl, r * .85, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#3a1080';
+        ctx.beginPath(); ctx.arc(cx, cy - r*.1 + fl, r * .7, 0, Math.PI*2); ctx.fill();
+        // Glowing red eyes
+        const ep = Math.sin(t * 4) * r * 0.08;
+        ctx.fillStyle = '#ff1020'; ctx.shadowColor = '#ff1020'; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(cx - r*.22, cy - r*.05 + fl + ep, r*.12, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + r*.22, cy - r*.05 + fl + ep, r*.12, 0, Math.PI*2); ctx.fill();
+    } else {
+        // Cave Lurker — squat rocky body
+        ctx.fillStyle = '#2a1a10';
+        ctx.beginPath(); ctx.ellipse(cx, cy + r*.2, r * 1.2, r * .85, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#5a3820';
+        ctx.beginPath(); ctx.ellipse(cx, cy, r * 1.05, r * .75, 0, 0, Math.PI*2); ctx.fill();
+        // Rocky texture patches
+        ctx.fillStyle = '#7a5030';
+        ctx.fillRect(cx - r*.7, cy - r*.3, r*.4, r*.3);
+        ctx.fillRect(cx + r*.2, cy + r*.05, r*.45, r*.25);
+        ctx.fillStyle = '#483020';
+        ctx.fillRect(cx - r*.15, cy - r*.5, r*.3, r*.22);
+        // Three orange eyes in a row
+        ctx.fillStyle = '#ff8010'; ctx.shadowColor = '#ff8010'; ctx.shadowBlur = 7;
+        for (let i = -1; i <= 1; i++)
+            ctx.beginPath(), ctx.arc(cx + i * r * .38, cy - r * .1, r * .13, 0, Math.PI*2), ctx.fill();
+    }
+    ctx.restore();
+    if (en.aggroed) ctx.restore();
+
+    // HP bar above enemy
+    const bw = TS * .8, bh = 5, bx = sx + TS*.1, by = sy - 10;
+    ctx.fillStyle = '#400000'; ctx.fillRect(bx, by, bw, bh);
+    const maxHp = ENEMY_DEFS[en.type].hp;
+    ctx.fillStyle = en.hp / maxHp > .5 ? '#40d040' : en.hp / maxHp > .25 ? '#d0a000' : '#d02020';
+    ctx.fillRect(bx, by, bw * (en.hp / maxHp), bh);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, bw, bh);
+}
+
+// ═══════════════════════════════════════════════════════
+//  BATTLE SYSTEM
+// ═══════════════════════════════════════════════════════
+function getPlayerAtk() {
+    return { Warrior:16, Rogue:13, Wizard:20, Cleric:11 }[gs.charClass] || 15;
+}
+
+function startBattle(enemy) {
+    battle.active = true;
+    battle.enemy = enemy;
+    battle.phase = 'player_timing';
+    battle.timer = 0;
+    battle.cursorPos = 0.1;
+    battle.cursorDir = 1;
+    battle.hitResult = '';
+    battle.hitDmg = 0;
+    battle.playerDmgTaken = 0;
+    showNotification(`A ${enemy.name} appears!`, 'danger');
+}
+
+function resolvePlayerAttack() {
+    if (!battle.active || battle.phase !== 'player_timing') return;
+    const p = battle.cursorPos;
+    let mult = 0, result = 'MISS!';
+    if      (p >= 0.44 && p <= 0.56) { mult = 1.6; result = 'CRITICAL!'; }
+    else if ((p >= 0.32 && p < 0.44) || (p > 0.56 && p <= 0.68)) { mult = 1.0; result = 'HIT!'; }
+    else if ((p >= 0.15 && p < 0.32) || (p > 0.68 && p <= 0.85)) { mult = 0.5; result = 'WEAK!'; }
+
+    battle.hitDmg    = Math.round(getPlayerAtk() * mult);
+    battle.hitResult = result;
+    battle.phase     = 'player_result';
+    battle.timer     = 1050;
+}
+
+function updateBattle(dt) {
+    if (!battle.active) return;
+    const en = battle.enemy;
+
+    if (battle.phase === 'player_timing') {
+        const speed = en.type === 'shade' ? 1.45 : 0.88;
+        battle.cursorPos += battle.cursorDir * speed * (dt / 1000);
+        if (battle.cursorPos >= 1) { battle.cursorPos = 1; battle.cursorDir = -1; }
+        if (battle.cursorPos <= 0) { battle.cursorPos = 0; battle.cursorDir = 1;  }
+
+    } else if (battle.phase === 'player_result') {
+        battle.timer -= dt;
+        if (battle.timer <= 0) {
+            en.hp -= battle.hitDmg;
+            if (en.hp <= 0) {
+                en.hp = 0;
+                en.alive = false;
+                battle.phase = 'victory';
+                battle.timer = 1800;
+            } else {
+                battle.phase = 'enemy_turn';
+                battle.timer = 1300;
+            }
+        }
+
+    } else if (battle.phase === 'enemy_turn') {
+        battle.timer -= dt;
+        if (battle.timer <= 0) {
+            battle.playerDmgTaken = ENEMY_DEFS[en.type].atk;
+            gs.hp = Math.max(0, gs.hp - battle.playerDmgTaken);
+            updateHPUI();
+            battle.phase = 'enemy_result';
+            battle.timer = 1000;
+        }
+
+    } else if (battle.phase === 'enemy_result') {
+        battle.timer -= dt;
+        if (battle.timer <= 0) {
+            if (gs.hp <= 0) { battle.phase = 'defeat'; battle.timer = 2200; }
+            else { battle.phase = 'player_timing'; }
+        }
+
+    } else if (battle.phase === 'victory') {
+        battle.timer -= dt;
+        if (battle.timer <= 0) endBattle(true);
+
+    } else if (battle.phase === 'defeat') {
+        battle.timer -= dt;
+        if (battle.timer <= 0) endBattle(false);
+    }
+}
+
+function endBattle(victory) {
+    battle.active = false;
+    if (victory) {
+        const xp = ENEMY_DEFS[battle.enemy.type].xp;
+        showNotification(`${battle.enemy.name} defeated! (+${xp} XP)`, 'quest');
+    } else {
+        gs.hp = Math.max(1, Math.floor(gs.maxHp * 0.2));
+        updateHPUI();
+        showNotification('You were defeated… Waking up in Eldoria.', 'danger');
+        setTimeout(() => changeMap('village', 22, 32), 600);
+    }
+}
+
+// ── Battle Rendering ────────────────────────────────────
+function renderBattle() {
+    if (!battle.active) return;
+    const W = canvas.width, H = canvas.height, t = timeMs / 1000;
+    const en = battle.enemy;
+
+    // ── Background ─────────────────────────────────────
+    ctx.fillStyle = '#080308'; ctx.fillRect(0, 0, W, H);
+    // Cave wall texture (top half)
+    const wallH = H * 0.55;
+    ctx.fillStyle = '#120a10'; ctx.fillRect(0, 0, W, wallH);
+    // Ground platform (bottom)
+    ctx.fillStyle = '#1e1018'; ctx.fillRect(0, wallH, W, H - wallH);
+    ctx.fillStyle = '#2a1622'; ctx.fillRect(0, wallH, W, 3);
+    // Background stalactites
+    ctx.fillStyle = '#0e080c';
+    for (let i = 0; i < 7; i++) {
+        const sx2 = (W * 0.08) + i * (W * 0.13);
+        const sh = H * (0.06 + (i % 3) * 0.04);
+        ctx.beginPath(); ctx.moveTo(sx2 - W*.022, 0); ctx.lineTo(sx2 + W*.022, 0); ctx.lineTo(sx2, sh); ctx.closePath(); ctx.fill();
+    }
+
+    // ── Enemy sprite (top-right) ───────────────────────
+    const ESZ = Math.min(W * 0.26, H * 0.38);
+    const ESX = W * 0.60, ESY = H * 0.06;
+    drawBattleSprite(ESX, ESY, ESZ, en.type, t);
+
+    // Enemy name + HP bar
+    const emaxhp = ENEMY_DEFS[en.type].hp;
+    drawBattleHPBar(W * 0.52, H * 0.04, W * 0.34, 20, en.hp, emaxhp, en.name, '#ff5050', false);
+
+    // ── Player sprite (bottom-left) ────────────────────
+    const PSZ = Math.min(W * 0.20, H * 0.30);
+    const PSX = W * 0.20, PSY = wallH - PSZ * 0.85;
+    drawBattlePlayerSprite(PSX, PSY, PSZ, t);
+
+    // Player HP bar
+    drawBattleHPBar(W * 0.04, wallH + H * 0.04, W * 0.34, 20, gs.hp, gs.maxHp, gs.charName, '#50d050', true);
+
+    // ── Phase UI ──────────────────────────────────────
+    if (battle.phase === 'player_timing') {
+        // Instruction
+        ctx.fillStyle = '#e8d8c0'; ctx.font = `bold ${Math.floor(H * 0.038)}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('Press SPACE to strike!', W / 2, wallH + H * 0.055);
+        drawTimingBar(W, H, wallH);
+
+    } else if (battle.phase === 'player_result') {
+        const colors = { 'CRITICAL!':'#ffd040', 'HIT!':'#70ff80', 'WEAK!':'#ff9040', 'MISS!':'#909090' };
+        const col = colors[battle.hitResult] || '#ffffff';
+        ctx.font = `bold ${Math.floor(H * 0.09)}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.shadowColor = col; ctx.shadowBlur = 22;
+        ctx.fillStyle = col; ctx.fillText(battle.hitResult, W * 0.62, wallH * 0.54);
+        if (battle.hitDmg > 0) {
+            ctx.font = `bold ${Math.floor(H * 0.055)}px sans-serif`;
+            ctx.fillStyle = '#ffff80'; ctx.shadowColor = '#ffff80';
+            ctx.fillText(`-${battle.hitDmg} HP`, W * 0.62, wallH * 0.54 + H * 0.10);
+        }
+        ctx.shadowBlur = 0;
+
+    } else if (battle.phase === 'enemy_turn') {
+        ctx.font = `bold ${Math.floor(H * 0.045)}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ff5555'; ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 16;
+        ctx.fillText(`${en.name} attacks!`, W / 2, wallH + H * 0.055);
+        ctx.shadowBlur = 0;
+
+    } else if (battle.phase === 'enemy_result') {
+        const shk = 1 - battle.timer / 1000;
+        const ox = shk < 0.4 ? Math.sin(shk * 80) * 6 : 0;
+        ctx.save(); ctx.translate(ox, 0);
+        ctx.font = `bold ${Math.floor(H * 0.08)}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ff4040'; ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 20;
+        ctx.fillText(`-${battle.playerDmgTaken} HP`, W * 0.20, wallH * 0.54);
+        ctx.shadowBlur = 0; ctx.restore();
+        ctx.font = `bold ${Math.floor(H * 0.045)}px sans-serif`;
+        ctx.fillStyle = '#ff5555'; ctx.textAlign = 'center';
+        ctx.fillText(`${en.name} attacks!`, W / 2, wallH + H * 0.055);
+
+    } else if (battle.phase === 'victory') {
+        ctx.font = `bold ${Math.floor(H * 0.09)}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffd040'; ctx.shadowColor = '#ffa000'; ctx.shadowBlur = 25;
+        ctx.fillText('VICTORY!', W / 2, H * 0.45);
+        ctx.font = `${Math.floor(H * 0.042)}px sans-serif`;
+        ctx.fillStyle = '#c8e890'; ctx.shadowBlur = 0;
+        ctx.fillText(`+${ENEMY_DEFS[en.type].xp} XP`, W / 2, H * 0.55);
+
+    } else if (battle.phase === 'defeat') {
+        ctx.font = `bold ${Math.floor(H * 0.09)}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ff3030'; ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 25;
+        ctx.fillText('DEFEATED', W / 2, H * 0.45);
+        ctx.font = `${Math.floor(H * 0.038)}px sans-serif`;
+        ctx.fillStyle = '#c0a0b0'; ctx.shadowBlur = 0;
+        ctx.fillText('Returning to Eldoria…', W / 2, H * 0.55);
+    }
+
+    ctx.shadowBlur = 0; ctx.textBaseline = 'alphabetic';
+}
+
+function drawBattleSprite(sx, sy, sz, type, t) {
+    const cx = sx + sz/2, cy = sy + sz * 0.5;
+    ctx.save();
+    if (type === 'shade') {
+        // Large wispy shade — multiple dark lobes
+        const fl = Math.sin(t * 2.4) * sz * 0.04;
+        ctx.fillStyle = '#0a021a';
+        ctx.beginPath(); ctx.arc(cx, cy + fl, sz * .42, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#150535';
+        ctx.beginPath(); ctx.arc(cx - sz*.18, cy - sz*.12 + fl, sz*.36, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + sz*.18, cy + sz*.04 + fl, sz*.34, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#220a50';
+        ctx.beginPath(); ctx.arc(cx, cy - sz*.06 + fl, sz*.30, 0, Math.PI*2); ctx.fill();
+        // Tendrils dripping down
+        ctx.fillStyle = '#0d0220';
+        for (let i = 0; i < 4; i++) {
+            const tx2 = cx + (i - 1.5) * sz * .18;
+            const th = sz * (0.18 + Math.sin(t*1.8 + i) * 0.06);
+            ctx.beginPath(); ctx.ellipse(tx2, cy + sz*.3 + th/2, sz*.045, th/2, 0, 0, Math.PI*2); ctx.fill();
+        }
+        // Glowing red eyes
+        ctx.shadowColor = '#ff0010'; ctx.shadowBlur = sz * .12;
+        ctx.fillStyle = '#ff1020';
+        ctx.beginPath(); ctx.arc(cx - sz*.10, cy - sz*.06 + fl, sz*.07, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + sz*.10, cy - sz*.06 + fl, sz*.07, 0, Math.PI*2); ctx.fill();
+        // Bright inner eye
+        ctx.fillStyle = '#ff9090'; ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(cx - sz*.10, cy - sz*.06 + fl, sz*.025, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + sz*.10, cy - sz*.06 + fl, sz*.025, 0, Math.PI*2); ctx.fill();
+
+    } else {
+        // Cave Lurker — large armored blob
+        // Body shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath(); ctx.ellipse(cx, cy + sz*.50, sz*.50, sz*.10, 0, 0, Math.PI*2); ctx.fill();
+        // Main body
+        ctx.fillStyle = '#1e0e08';
+        ctx.beginPath(); ctx.ellipse(cx, cy, sz*.45, sz*.40, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#4a2818';
+        ctx.beginPath(); ctx.ellipse(cx, cy - sz*.03, sz*.40, sz*.35, 0, 0, Math.PI*2); ctx.fill();
+        // Rock armor plating
+        const plates = [
+            {ox:-0.22,oy:-0.18,w:.22,h:.17},
+            {ox: 0.05,oy:-0.26,w:.26,h:.15},
+            {ox: 0.18,oy:-0.06,w:.20,h:.18},
+            {ox:-0.10,oy: 0.08,w:.24,h:.16},
+            {ox: 0.10,oy: 0.15,w:.18,h:.14},
+        ];
+        for (const pl of plates) {
+            ctx.fillStyle = '#6a3c20';
+            ctx.beginPath();
+            ctx.ellipse(cx + pl.ox*sz, cy + pl.oy*sz, pl.w*sz, pl.h*sz, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#8a5030';
+            ctx.beginPath();
+            ctx.ellipse(cx + pl.ox*sz - sz*.01, cy + pl.oy*sz - sz*.015, pl.w*sz*.65, pl.h*sz*.55, 0, 0, Math.PI*2);
+            ctx.fill();
+        }
+        // Three glowing orange eyes
+        ctx.shadowColor = '#ff8010'; ctx.shadowBlur = sz * .10;
+        ctx.fillStyle = '#ff8010';
+        const eyeY = cy - sz * .07;
+        for (let i = -1; i <= 1; i++) {
+            ctx.beginPath(); ctx.arc(cx + i*sz*.18, eyeY, sz*.065, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.fillStyle = '#ffdd80'; ctx.shadowBlur = 0;
+        for (let i = -1; i <= 1; i++) {
+            ctx.beginPath(); ctx.arc(cx + i*sz*.18, eyeY, sz*.022, 0, Math.PI*2); ctx.fill();
+        }
+        // Claws at bottom
+        ctx.fillStyle = '#2a1208';
+        for (let i = -1; i <= 1; i++) {
+            ctx.beginPath();
+            ctx.moveTo(cx + i*sz*.20 - sz*.05, cy + sz*.30);
+            ctx.lineTo(cx + i*sz*.20, cy + sz*.48);
+            ctx.lineTo(cx + i*sz*.20 + sz*.05, cy + sz*.30);
+            ctx.fill();
+        }
+    }
+    ctx.restore();
+}
+
+function drawBattlePlayerSprite(sx, sy, sz, t) {
+    // Small player silhouette for battle scene (back-facing, slightly simplified)
+    const cx = sx + sz/2, cy = sy + sz/2;
+    const col = CLASS_COLORS[gs.charClass] || CLASS_COLORS.Warrior;
+    const cloak = CLASS_CLOAK[gs.charClass] || '#4a2810';
+    ctx.save();
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(cx, cy + sz*.40, sz*.30, sz*.07, 0, 0, Math.PI*2); ctx.fill();
+    // Cloak / body
+    ctx.fillStyle = cloak;
+    ctx.beginPath(); ctx.arc(cx, cy + sz*.05, sz*.38, 0, Math.PI*2); ctx.fill();
+    // Body
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(cx, cy, sz*.32, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2; ctx.stroke();
+    // Head (facing up — back to camera)
+    ctx.fillStyle = '#e8cfa0';
+    ctx.beginPath(); ctx.arc(cx, cy - sz*.28, sz*.17, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+    // Hair/hood
+    ctx.fillStyle = cloak;
+    ctx.beginPath(); ctx.arc(cx, cy - sz*.32, sz*.16, Math.PI, Math.PI*2); ctx.fill();
+    // Weapon visible on side
+    const hasWeapon2 = gs.inventory.some(i => i.questComplete === 'quest_weapon_complete');
+    if (hasWeapon2) {
+        ctx.fillStyle = '#a0a8d0'; ctx.strokeStyle = '#606080'; ctx.lineWidth = 2;
+        ctx.save(); ctx.translate(cx + sz*.25, cy - sz*.12); ctx.rotate(-0.3);
+        ctx.fillRect(-sz*.04, -sz*.30, sz*.07, sz*.42); // blade
+        ctx.fillStyle = '#6a3010'; ctx.fillRect(-sz*.06, sz*.05, sz*.11, sz*.08); // guard
+        ctx.restore();
+    }
+    ctx.restore();
+}
+
+function drawBattleHPBar(bx, by, bw, bh, hp, maxHp, label, barColor, showLabel) {
+    const pct = Math.max(0, hp / maxHp);
+    // Background track
+    ctx.fillStyle = '#1a0a10'; ctx.fillRect(bx, by, bw, bh);
+    // Fill
+    const fillColor = pct > 0.5 ? barColor : pct > 0.25 ? '#d0a000' : '#d02020';
+    ctx.fillStyle = fillColor; ctx.fillRect(bx + 1, by + 1, (bw - 2) * pct, bh - 2);
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(bx + 1, by + 1, (bw - 2) * pct, Math.ceil(bh * 0.35));
+    // Border
+    ctx.strokeStyle = '#5a3040'; ctx.lineWidth = 1.5; ctx.strokeRect(bx, by, bw, bh);
+    // HP text inside bar
+    ctx.font = `bold ${Math.max(10, bh - 4)}px sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillText(`${Math.ceil(hp)}/${maxHp}`, bx + 4, by + bh/2);
+    // Label
+    if (showLabel) {
+        ctx.font = `${Math.max(9, bh - 6)}px sans-serif`;
+        ctx.textAlign = 'right'; ctx.fillStyle = '#c0a0b0';
+        ctx.fillText(label, bx + bw - 4, by + bh/2);
+    }
+    ctx.textBaseline = 'alphabetic';
+}
+
+function drawTimingBar(W, H, groundY) {
+    const bw = W * 0.55, bh = Math.floor(H * 0.045);
+    const bx = (W - bw) / 2, by = groundY + H * 0.12;
+
+    // Zone fills (drawn left to right)
+    const zones = [
+        {from:0,    to:0.15,  color:'#502010'}, // miss
+        {from:0.15, to:0.32,  color:'#7a4010'}, // weak
+        {from:0.32, to:0.44,  color:'#708020'}, // hit
+        {from:0.44, to:0.56,  color:'#20a020'}, // critical (green)
+        {from:0.56, to:0.68,  color:'#708020'}, // hit
+        {from:0.68, to:0.85,  color:'#7a4010'}, // weak
+        {from:0.85, to:1.0,   color:'#502010'}, // miss
+    ];
+    for (const z of zones) {
+        ctx.fillStyle = z.color;
+        ctx.fillRect(bx + bw * z.from, by, bw * (z.to - z.from), bh);
+    }
+
+    // Zone labels
+    ctx.font = `bold ${Math.floor(bh * 0.45)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText('CRIT', bx + bw * 0.50, by + bh/2);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillText('HIT', bx + bw * 0.38, by + bh/2);
+    ctx.fillText('HIT', bx + bw * 0.62, by + bh/2);
+
+    // Border
+    ctx.strokeStyle = '#806050'; ctx.lineWidth = 2; ctx.strokeRect(bx, by, bw, bh);
+
+    // Cursor marker
+    const cx2 = bx + bw * battle.cursorPos;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.moveTo(cx2, by - 6); ctx.lineTo(cx2 - 6, by - 14); ctx.lineTo(cx2 + 6, by - 14); ctx.closePath(); ctx.fill();
+    ctx.fillRect(cx2 - 3, by, 6, bh);
+    ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 10;
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx2, by + bh/2, 4, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // "ATTACK" label above bar
+    ctx.font = `bold ${Math.floor(H * 0.028)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.fillStyle = '#e0c890';
+    ctx.fillText('ATTACK TIMING', W / 2, by - 20);
+    ctx.textBaseline = 'alphabetic';
+}
+
+function updateHPUI() {
+    const fill = document.getElementById('hp-fill');
+    const text = document.getElementById('hp-text');
+    if (fill) fill.style.width = `${Math.max(0, (gs.hp / gs.maxHp) * 100)}%`;
+    if (text) text.textContent = `${Math.ceil(gs.hp)}/${gs.maxHp}`;
+}
+
+// ═══════════════════════════════════════════════════════
 //  RENDER
 // ═══════════════════════════════════════════════════════
 function render() {
@@ -1954,6 +2501,15 @@ function render() {
         if (sx>-TS*2&&sx<canvas.width+TS&&sy>-TS*2&&sy<canvas.height+TS)
             drawCharacter(sx,sy,npc.color,'down',npc.name,false,isAdjacent(npc.x,npc.y),npc.ghost);
     }
+    // Draw overworld enemies
+    if (currentMap.enemies) {
+        for (const en of currentMap.enemies) {
+            if (!en.alive) continue;
+            const sx=en.x*TS-cam.x, sy=en.y*TS-cam.y;
+            if (sx>-TS*2&&sx<canvas.width+TS*2&&sy>-TS*2&&sy<canvas.height+TS*2)
+                drawEnemyOverworld(sx, sy, en);
+        }
+    }
     drawCharacter(player.renderX-cam.x, player.renderY-cam.y,
         CLASS_COLORS[gs.charClass]||CLASS_COLORS.Warrior,
         player.facing,'',true,false,false,player.walkPhase,player.isMoving);
@@ -1961,7 +2517,8 @@ function render() {
     renderParticles();  // ambient particles (fireflies, dust, sparks, leaves)
     renderLighting();   // dynamic darkness + torch light + warm color bleed
     renderVignette();   // corner vignette in interiors
-    updateHintBar();
+    if (battle.active) renderBattle();
+    else updateHintBar();
 }
 
 function isAdjacent(nx,ny){return Math.abs(nx-player.x)+Math.abs(ny-player.y)===1;}
@@ -2297,7 +2854,9 @@ document.getElementById('pause-mainmenu').addEventListener('click', () => {
 let lastTs=0;
 function loop(ts){
     const dt=Math.min(ts-lastTs,100);lastTs=ts;timeMs=ts;
-    updateMovement(dt);updatePlayerAnim(dt);updateCamera();updateParticles(dt);render();
+    updateMovement(dt);updatePlayerAnim(dt);updateCamera();
+    updateEnemies(dt);updateBattle(dt);
+    updateParticles(dt);render();
     requestAnimationFrame(loop);
 }
 
@@ -2376,6 +2935,8 @@ function playIntroSequence() {
 
 function startGame(name,charClass) {
     gs.charName=name;gs.charClass=charClass;gs.flags={};gs.inventory=[];
+    const classMaxHp={Warrior:60,Rogue:45,Wizard:35,Cleric:55};
+    gs.maxHp=classMaxHp[charClass]||50; gs.hp=gs.maxHp;
     currentMap=MAPS.village;
     [...VILLAGE_NPCS,...GUIDE_NPCS,...DUNGEON_NPCS,...ELDER_NPCS,...BLACKSMITH_NPCS,...VEYLA_NPCS].forEach(n=>n.history=[]);
     MAPS.village.items=[];
@@ -2393,7 +2954,7 @@ function startGame(name,charClass) {
     document.getElementById('hud-name').textContent=name;
     document.getElementById('hud-class').textContent=charClass;
     document.getElementById('hud-location').textContent=currentMap.name;
-    updateQuestUI();updateInventoryUI();
+    updateQuestUI();updateInventoryUI();updateHPUI();
     startMusic();
     requestAnimationFrame(loop);
     // Black intro sequence — fades out after the cinematic lines
