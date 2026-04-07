@@ -164,7 +164,7 @@
             <span class="hud-sep">·</span>
             <span>Q Quests</span>
             <span class="hud-sep">·</span>
-            <span>Esc Close</span>
+            <span>Esc Pause</span>
         </div>
         <div id="hud-right">
             <div id="inv-bar"></div>
@@ -201,6 +201,20 @@
 
     <!-- Notifications -->
     <div id="notifications"></div>
+
+    <!-- Pause Menu overlay -->
+    <div id="pause-menu" class="overlay hidden">
+        <div class="pause-backdrop"></div>
+        <div class="pause-card">
+            <div class="pause-title">⏸ PAUSED</div>
+            <div class="pause-vol-row">
+                <label for="pause-vol">♪ Music Volume</label>
+                <input type="range" id="pause-vol" min="0" max="100" value="50">
+            </div>
+            <button id="pause-resume" class="pause-btn primary">▶ Resume</button>
+            <button id="pause-mainmenu" class="pause-btn">⌂ Main Menu</button>
+        </div>
+    </div>
 
     <!-- NPC Dialogue overlay -->
     <div id="dialogue-box" class="overlay hidden">

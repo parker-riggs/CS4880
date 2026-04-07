@@ -488,3 +488,82 @@ html, body {
     background: rgba(10,15,25,0.97);
     border: 1px solid #4a6a90; color: #90b8d8;
 }
+
+/* ── Pause Menu ────────────────────────────────────── */
+#pause-menu {
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 500;
+}
+#pause-menu.hidden { display: none !important; }
+
+.pause-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(4,3,8,0.72);
+    backdrop-filter: blur(3px);
+}
+
+.pause-card {
+    position: relative;
+    background: linear-gradient(160deg, #100d18 0%, #0a0810 100%);
+    border: 1px solid #3a2a5a;
+    box-shadow: 0 0 60px rgba(80,40,120,0.35), inset 0 0 30px rgba(0,0,0,0.5);
+    border-radius: 6px;
+    padding: 40px 48px;
+    min-width: 320px;
+    display: flex; flex-direction: column; align-items: center; gap: 22px;
+    font-family: 'Cinzel', serif;
+}
+
+.pause-title {
+    font-size: 1.8rem; font-weight: 700;
+    color: #c8a060;
+    letter-spacing: 6px;
+    text-shadow: 0 0 18px rgba(200,160,80,0.4);
+}
+
+.pause-vol-row {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    width: 100%;
+}
+.pause-vol-row label {
+    font-size: 0.82rem; letter-spacing: 2px;
+    color: #8a7060;
+}
+#pause-vol {
+    width: 100%; appearance: none;
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, #c8a060 var(--pct,50%), #2a2030 var(--pct,50%));
+    outline: none; cursor: pointer;
+}
+#pause-vol::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #c8a060;
+    box-shadow: 0 0 6px rgba(200,160,80,0.6);
+    cursor: pointer;
+}
+
+.pause-btn {
+    width: 100%; padding: 12px 0;
+    background: transparent;
+    border: 1px solid #3a2a4a;
+    border-radius: 4px;
+    color: #a09080;
+    font-family: 'Cinzel', serif;
+    font-size: 0.88rem; letter-spacing: 3px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.pause-btn:hover {
+    background: rgba(80,50,120,0.3);
+    border-color: #6a4a90; color: #d4b896;
+}
+.pause-btn.primary {
+    border-color: #6a5030; color: #c8a060;
+    box-shadow: 0 0 10px rgba(200,160,80,0.1);
+}
+.pause-btn.primary:hover {
+    background: rgba(100,70,20,0.3);
+    border-color: #c8a060; color: #e0c070;
+}

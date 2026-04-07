@@ -259,7 +259,7 @@ let currentMap = MAPS.village;
 
 const player  = { x:7, y:8, facing:'down' };
 const cam     = { x:0, y:0 };
-const ui      = { dialogue:null, sign:null, loading:false, questLog:false };
+const ui      = { dialogue:null, sign:null, loading:false, questLog:false, paused:false };
 let timeMs    = 0;
 let TS        = 48;
 const HUD_H   = 40, HINT_H = 26;
@@ -293,14 +293,18 @@ document.addEventListener('keydown', e => {
     KEYS.add(e.key);
     if (e.key === 'e' || e.key === 'E') { e.preventDefault(); handleInteract(); }
     if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); toggleQuestLog(); }
-    if (e.key === 'Escape') { closeDialogue(); closeSign(); closeQuestLog(); }
+    if (e.key === 'Escape') {
+        if (ui.paused) { closePause(); }
+        else if (ui.dialogue || ui.sign || ui.questLog) { closeDialogue(); closeSign(); closeQuestLog(); }
+        else { openPause(); }
+    }
 });
 document.addEventListener('keyup', e => KEYS.delete(e.key));
 
 let moveAccum = 999;
 
 function updateMovement(dt) {
-    if (ui.dialogue || ui.sign || ui.questLog || ui.loading) { JUST_PRESSED.clear(); return; }
+    if (ui.dialogue || ui.sign || ui.questLog || ui.loading || ui.paused) { JUST_PRESSED.clear(); return; }
     const dirs = [
         { keys:['ArrowUp','w','W'],    dx:0,  dy:-1, f:'up'    },
         { keys:['ArrowDown','s','S'],  dx:0,  dy:1,  f:'down'  },
@@ -1094,6 +1098,49 @@ function scheduleMelody(wet,dry){
 function stopMusic(){clearInterval(melodyTimer);melodyTimer=null;allNodes.forEach(n=>{try{n.stop?n.stop():n.disconnect();}catch(e){}});allNodes=[];if(audioCtx){audioCtx.close();audioCtx=null;masterGain=null;}}
 
 // ═══════════════════════════════════════════════════════
+//  PAUSE MENU
+// ═══════════════════════════════════════════════════════
+const _pauseEl  = () => document.getElementById('pause-menu');
+const _pauseVol = () => document.getElementById('pause-vol');
+
+function openPause() {
+    if (document.getElementById('game-screen').classList.contains('hidden')) return;
+    ui.paused = true;
+    if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
+    // Sync slider to current master volume
+    const vol = masterGain ? Math.round(masterGain.gain.value / 0.25 * 50) : 50;
+    const slider = _pauseVol();
+    slider.value = Math.min(100, Math.max(0, vol));
+    _updateSliderFill(slider);
+    _pauseEl().classList.remove('hidden');
+}
+
+function closePause() {
+    ui.paused = false;
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    _pauseEl().classList.add('hidden');
+}
+
+function _updateSliderFill(slider) {
+    slider.style.setProperty('--pct', slider.value + '%');
+}
+
+// Wire up slider
+document.getElementById('pause-vol').addEventListener('input', function() {
+    _updateSliderFill(this);
+    if (masterGain) masterGain.gain.value = (this.value / 100) * 0.25;
+});
+
+// Resume button
+document.getElementById('pause-resume').addEventListener('click', closePause);
+
+// Main Menu button (reuses the restart flow)
+document.getElementById('pause-mainmenu').addEventListener('click', () => {
+    closePause();
+    document.getElementById('restart-btn').click();
+});
+
+// ═══════════════════════════════════════════════════════
 //  GAME LOOP
 // ═══════════════════════════════════════════════════════
 let lastTs=0;
@@ -1112,7 +1159,8 @@ function startGame(name,charClass) {
     [...VILLAGE_NPCS,...DUNGEON_NPCS].forEach(n=>n.history=[]);
     MAPS.dungeon_1.items=[...DUNGEON_ITEMS.map(i=>({...i}))];
     player.x=7;player.y=8;player.facing='down';
-    ui.dialogue=null;ui.sign=null;ui.questLog=false;ui.loading=false;
+    ui.dialogue=null;ui.sign=null;ui.questLog=false;ui.loading=false;ui.paused=false;
+    _pauseEl().classList.add('hidden');
     resizeCanvas();
     document.getElementById('start-screen').classList.add('hidden');
     document.getElementById('game-screen').classList.remove('hidden');
