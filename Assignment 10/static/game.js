@@ -707,7 +707,7 @@ function grantXP(amount) {
         gs.maxHp += hpGain;
         gs.hp = Math.min(gs.hp + Math.ceil(hpGain / 2), gs.maxHp);
         updateHPUI();
-        showNotification(`Level Up! Now Level ${gs.level}  (+${hpGain} Max HP)`, 'quest');
+        showNotification(`Level Up!  Lv ${gs.level}  +${hpGain} Max HP`, 'levelup');
     }
     updateInventoryUI();
 }
@@ -2616,9 +2616,9 @@ function drawBattleMenu(x, y, w, h) {
 function drawBattleItemMenu(x, y, w, h) {
     const items = gs.inventory;
     if (items.length === 0) {
-        ctx.font = `${Math.floor(h * 0.14)}px sans-serif`;
+        ctx.font = `italic ${Math.floor(h * 0.14)}px 'IM Fell English', serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#5a4030'; ctx.fillStyle = 'italic';
+        ctx.fillStyle = '#7a5a40';
         ctx.fillText('Pack is empty.', x + w / 2, y + h / 2);
         ctx.textBaseline = 'alphabetic'; return;
     }
@@ -2659,15 +2659,15 @@ function drawTimingBarInBox(x, y, w, h, en) {
     const pad = 16, bh = Math.floor(h * 0.18);
     const barY = y + h * 0.46, barX = x + pad, barW = w - pad * 2;
 
-    // Zone fills
+    // Zone fills — MISS(dark) | WEAK(orange) | HIT(yellow-green) | CRIT(bright green) | HIT | WEAK | MISS
     const zones = [
-        {from:0,    to:0.15,  col:'#4a1808'},
-        {from:0.15, to:0.32,  col:'#6a3808'},
-        {from:0.32, to:0.44,  col:'#5a6010'},
-        {from:0.44, to:0.56,  col:'#188028'},
-        {from:0.56, to:0.68,  col:'#5a6010'},
-        {from:0.68, to:0.85,  col:'#6a3808'},
-        {from:0.85, to:1.0,   col:'#4a1808'},
+        {from:0,    to:0.15,  col:'#3a0e06'},
+        {from:0.15, to:0.32,  col:'#7a3206'},
+        {from:0.32, to:0.44,  col:'#7a7408'},
+        {from:0.44, to:0.56,  col:'#0a7820'},
+        {from:0.56, to:0.68,  col:'#7a7408'},
+        {from:0.68, to:0.85,  col:'#7a3206'},
+        {from:0.85, to:1.0,   col:'#3a0e06'},
     ];
     for (const z of zones) {
         ctx.fillStyle = z.col;
@@ -2831,7 +2831,17 @@ function drawBattlePlayerSprite(sx, sy, sz) {
 function updateHPUI() {
     const fill = document.getElementById('hp-fill');
     const text = document.getElementById('hp-text');
-    if (fill) fill.style.width = `${Math.max(0, (gs.hp / gs.maxHp) * 100)}%`;
+    if (fill) {
+        const pct = Math.max(0, gs.hp / gs.maxHp);
+        fill.style.width = `${pct * 100}%`;
+        if (pct > 0.60) {
+            fill.style.background = 'linear-gradient(to right, #208820, #40c040)';
+        } else if (pct > 0.30) {
+            fill.style.background = 'linear-gradient(to right, #c07010, #e0a020)';
+        } else {
+            fill.style.background = 'linear-gradient(to right, #c02020, #e04040)';
+        }
+    }
     if (text) text.textContent = `${Math.ceil(gs.hp)}/${gs.maxHp}`;
 }
 
@@ -2895,7 +2905,13 @@ function updateHintBar() {
             const entrances = BUILDING_ENTRANCES[currentMap.id];
             if (entrances?.[`${tx},${ty}`]) { hint='Walk into door to enter'; break; }
         }
-        if (tile===TILE.STAIRS)  { hint='Press E to descend'; break; }
+        if (tile===TILE.STAIRS) {
+            const noWeapon = !gs.inventory.some(i => i.questComplete === 'quest_weapon_complete');
+            hint = noWeapon
+                ? '⚠ No weapon equipped — the mines are dangerous! (Press E to descend anyway)'
+                : 'Press E to descend into the Cursed Mines';
+            break;
+        }
         if (tile===TILE.STAIRSUP){ hint=currentMap.returnMap?'Press E to exit':'Press E to ascend'; break; }
         const npc=currentMap.npcs.find(n=>n.x===tx&&n.y===ty);
         if (npc) { hint=`Press E to talk to ${npc.name}`; break; }
@@ -2974,7 +2990,9 @@ async function startDialogue(npc) {
     const box=document.getElementById('dialogue-box');
     document.getElementById('dlg-name').textContent=npc.name;
     document.getElementById('dlg-portrait').textContent=npc.portrait;
-    document.getElementById('dlg-text').textContent='…';
+    const dlgText=document.getElementById('dlg-text');
+    dlgText.textContent='Thinking…';
+    dlgText.classList.add('dlg-loading');
     document.getElementById('dlg-player-msg').textContent='';
     _dlgSetInputEnabled(false);
     box.classList.remove('hidden');
@@ -2994,7 +3012,9 @@ async function sendDialogueMessage() {
     const npc=ui.dialogue;
     ui.loading=true;
     document.getElementById('dlg-player-msg').textContent=`You: "${text}"`;
-    document.getElementById('dlg-text').textContent='…';
+    const dlgText2=document.getElementById('dlg-text');
+    dlgText2.textContent='Thinking…';
+    dlgText2.classList.add('dlg-loading');
     _dlgSetInputEnabled(false);
     const data=await callInteract(npc,text,npc.history);
     npc.history=data.history;
@@ -3021,7 +3041,9 @@ async function callInteract(npc,playerText,history) {
 }
 
 function showDialogueData(data) {
-    document.getElementById('dlg-text').textContent=data.dialogue;
+    const el=document.getElementById('dlg-text');
+    el.textContent=data.dialogue;
+    el.classList.remove('dlg-loading');
     _dlgSetInputEnabled(true);
 }
 

@@ -65,9 +65,15 @@ html, body {
 /* ── Main Menu ─────────────────────────────────── */
 .menu-title-block { text-align: center; margin-bottom: 48px; }
 
+@keyframes title-deco-pulse {
+    0%, 100% { opacity: 0.55; text-shadow: none; }
+    50%       { opacity: 1;   text-shadow: 0 0 10px rgba(200,146,42,0.6); }
+}
+
 .title-deco {
-    font-size: 1rem; color: #6a4a20;
+    font-size: 1rem; color: #c8922a;
     letter-spacing: 8px; margin-bottom: 14px;
+    animation: title-deco-pulse 3.5s ease-in-out infinite;
 }
 
 #menu-title {
@@ -133,7 +139,7 @@ html, body {
 
 .menu-footer {
     text-align: center; font-size: 0.7rem;
-    color: #3a2a14; letter-spacing: 2px; text-transform: uppercase;
+    color: #6a5030; letter-spacing: 2px; text-transform: uppercase;
 }
 
 /* ── Shared Panel Styles ───────────────────────── */
@@ -228,7 +234,13 @@ html, body {
 }
 
 /* ── How to Play ───────────────────────────────── */
-.howto-grid { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }
+.howto-grid { display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
+
+.howto-section-label {
+    font-family: 'Cinzel', serif; font-size: 0.72rem;
+    color: #c8922a; letter-spacing: 3px; text-transform: uppercase;
+    margin-bottom: 8px; margin-top: 4px;
+}
 
 .howto-row {
     display: flex; align-items: center; gap: 20px;
@@ -456,20 +468,34 @@ html, body {
     min-height: 1rem;
 }
 
+@keyframes dlg-thinking {
+    0%   { opacity: 0.3; }
+    50%  { opacity: 1;   }
+    100% { opacity: 0.3; }
+}
+
 #dlg-text {
     font-size: 1rem; line-height: 1.75;
     color: #d4b896; margin-bottom: 16px;
     min-height: 3rem;
 }
 
+#dlg-text.dlg-loading {
+    color: #7a5a38;
+    font-style: italic;
+    animation: dlg-thinking 1.2s ease-in-out infinite;
+}
+
 .dlg-close-btn {
     margin-left: auto;
-    background: none; border: none;
-    color: #6a4820; font-size: 1rem;
-    cursor: pointer; padding: 2px 6px;
-    transition: color 0.15s;
+    background: rgba(255,255,255,0.04); border: 1px solid #4a2e12;
+    border-radius: 3px;
+    color: #8a6840; font-size: 0.9rem;
+    cursor: pointer; padding: 4px 9px;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    line-height: 1;
 }
-.dlg-close-btn:hover { color: #c8922a; }
+.dlg-close-btn:hover { color: #e8c080; border-color: #c8922a; background: rgba(200,146,42,0.10); }
 
 .dlg-input-row {
     display: flex; gap: 8px; align-items: center;
@@ -516,10 +542,16 @@ html, body {
 .inv-item:hover { border-color: #c8922a; }
 
 /* ── Quest Log overlay ─────────────────────────────── */
+@keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(18px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
 #quest-log {
     top: 50px; right: 16px;
     width: min(360px, 94vw);
     max-height: calc(100vh - 120px);
+    animation: slide-in-right 0.22s ease forwards;
 }
 
 .quest-log-inner {
@@ -591,6 +623,8 @@ html, body {
     opacity: 0; transform: translateY(-8px);
     transition: opacity 0.3s ease, transform 0.3s ease;
     white-space: nowrap;
+    max-width: min(520px, 90vw);
+    overflow: hidden; text-overflow: ellipsis;
 }
 .notif-show { opacity: 1; transform: translateY(0); }
 
@@ -608,6 +642,17 @@ html, body {
     background: rgba(10,15,25,0.97);
     border: 1px solid #4a6a90; color: #90b8d8;
 }
+.notif-danger {
+    background: rgba(30,5,5,0.97);
+    border: 1px solid #c03030; color: #e06060;
+    box-shadow: 0 0 20px rgba(200,30,30,0.30);
+}
+.notif-levelup {
+    background: rgba(25,18,5,0.97);
+    border: 1px solid #e0c040; color: #f0d870;
+    box-shadow: 0 0 24px rgba(220,180,40,0.40);
+    font-weight: 700;
+}
 
 /* ── Pause Menu ────────────────────────────────────── */
 #pause-menu {
@@ -619,15 +664,15 @@ html, body {
 
 .pause-backdrop {
     position: absolute; inset: 0;
-    background: rgba(4,3,8,0.72);
+    background: rgba(4,2,1,0.76);
     backdrop-filter: blur(3px);
 }
 
 .pause-card {
     position: relative;
-    background: linear-gradient(160deg, #100d18 0%, #0a0810 100%);
-    border: 1px solid #3a2a5a;
-    box-shadow: 0 0 60px rgba(80,40,120,0.35), inset 0 0 30px rgba(0,0,0,0.5);
+    background: linear-gradient(160deg, #120d06 0%, #0a0702 100%);
+    border: 1px solid #5a3a18;
+    box-shadow: 0 0 60px rgba(200,146,42,0.12), inset 0 0 30px rgba(0,0,0,0.6);
     border-radius: 6px;
     padding: 40px 48px;
     min-width: 320px;
@@ -667,25 +712,25 @@ html, body {
 .pause-btn {
     width: 100%; padding: 12px 0;
     background: transparent;
-    border: 1px solid #3a2a4a;
+    border: 1px solid #4a3018;
     border-radius: 4px;
-    color: #a09080;
+    color: #9a7a58;
     font-family: 'Cinzel', serif;
     font-size: 0.88rem; letter-spacing: 3px;
     cursor: pointer;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .pause-btn:hover {
-    background: rgba(80,50,120,0.3);
-    border-color: #6a4a90; color: #d4b896;
+    background: rgba(200,146,42,0.10);
+    border-color: #8a6030; color: #d4b896;
 }
 .pause-btn.primary {
-    border-color: #6a5030; color: #c8a060;
-    box-shadow: 0 0 10px rgba(200,160,80,0.1);
+    border-color: #7a5020; color: #c8a060;
+    box-shadow: 0 0 10px rgba(200,160,80,0.12);
 }
 .pause-btn.primary:hover {
-    background: rgba(100,70,20,0.3);
-    border-color: #c8a060; color: #e0c070;
+    background: rgba(200,146,42,0.18);
+    border-color: #c8922a; color: #e8c870;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -857,7 +902,7 @@ html, body {
 
 .slot-icon { font-size: 1.6rem; line-height: 1; }
 .slot-name {
-    font-size: 0.58rem; color: #7a5a38;
+    font-size: 0.68rem; color: #7a5a38;
     line-height: 1.2; word-break: break-word;
     max-width: 100%;
 }
