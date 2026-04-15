@@ -12,6 +12,83 @@ const WALKABLE = new Set([
     TILE.GRASS, TILE.PATH, TILE.FLOOR,
     TILE.DOOR, TILE.STAIRS, TILE.STAIRSUP,
 ]);
+// Tiles that animate every frame and must bypass the bg cache
+const ANIMATED_TILES = new Set([TILE.WATER, TILE.STAIRS, TILE.STAIRSUP, TILE.TORCH]);
+
+// ═══════════════════════════════════════════════════════
+//  COLOUR PALETTE  — locked 32-colour pixel-art palette
+//  Every tile, sprite, particle and UI element draws
+//  exclusively from these values. No arbitrary hex.
+// ═══════════════════════════════════════════════════════
+const PALETTE = Object.freeze({
+    // ── DARKS (5) ────────────────────────────────────────
+    D_VOID:    '#080408',  // 01 absolute black / void
+    D_BROWN:   '#2a1408',  // 02 shadow brown (trunk, deep shadow)
+    D_BLUE:    '#18182a',  // 03 dark gray-blue (dungeon void)
+    D_STONE:   '#1e1c18',  // 04 dark stone gray (ceiling, rock)
+    D_GREEN:   '#1a4008',  // 05 darkest canopy green (tree outer)
+
+    // ── MIDS (8) ─────────────────────────────────────────
+    M_STONE:   '#686860',  // 06 mid stone gray (exterior wall face)
+    M_CLAY:    '#8a5a28',  // 07 clay brown (floor, path mortar)
+    M_MOSS:    '#4a7030',  // 08 moss green (mid grass, tile details)
+    M_TEAL:    '#2a4840',  // 09 dungeon teal (dungeon ambient)
+    M_SLATE:   '#3a4868',  // 10 slate blue (shadow stone, deep water)
+    M_BRICK:   '#8a3020',  // 11 brick red (accent, timing zone)
+    M_SAND:    '#c8a060',  // 12 sand / tan (path stone, dry grass)
+    M_FOREST:  '#3a6820',  // 13 forest green (grass base, tree mid)
+
+    // ── LIGHTS (7) ───────────────────────────────────────
+    L_STONE:   '#c8c0a0',  // 14 light stone (cobble highlight, beam top)
+    L_PARCH:   '#d4b896',  // 15 parchment (sign board, light plank)
+    L_GOLD:    '#d4a030',  // 16 gold (UI, treasure, class Warrior)
+    L_BLUE:    '#90a8c8',  // 17 pale blue (water highlight, Wizard)
+    L_WHITE:   '#f0e8d0',  // 18 warm white (specular pixel, flame tip)
+    L_LEAF:    '#58c830',  // 19 bright leaf green (grass highlight)
+    L_WATER:   '#48b8d0',  // 20 water cyan (shimmer, water surface)
+
+    // ── ACCENTS (6) ──────────────────────────────────────
+    A_RED:     '#e02828',  // 21 danger red (HP crit, flame core)
+    A_ORANGE:  '#e86010',  // 22 fire orange (torch, flame)
+    A_YELLOW:  '#f0d020',  // 23 bright yellow (crit hit, Cleric)
+    A_PURPLE:  '#9030d0',  // 24 magic purple (Shade, Rogue)
+    A_GHOST:   '#90c8f0',  // 25 ghost blue-white (spirit, ice)
+    A_RARE:    '#e050a0',  // 26 rare pink (flowers, lily, rare items)
+
+    // ── SKIN / FLESH (3) ─────────────────────────────────
+    S_PALE:    '#f0c890',  // 27 pale skin
+    S_MID:     '#c88850',  // 28 mid skin / medium wood plank
+    S_DARK:    '#8a5030',  // 29 dark skin / dark wood plank
+
+    // ── UI (3) ───────────────────────────────────────────
+    U_BG:      '#0e0a0c',  // 30 UI panel background
+    U_GOLD:    '#c8901a',  // 31 UI border gold
+    U_TEXT:    '#e8dcc8',  // 32 UI text cream
+
+    // ── SEMANTIC ALIASES (all resolve to values above) ───
+    MAP_DARK_BG:   '#080408',  // = D_VOID
+    HP_FULL:       '#58c830',  // = L_LEAF
+    HP_MID:        '#d4a030',  // = L_GOLD
+    HP_LOW:        '#e02828',  // = A_RED
+    HP_BG:         '#080408',  // = D_VOID
+    XP_FILL:       '#3a4868',  // = M_SLATE
+    SHADE_BODY:    '#9030d0',  // = A_PURPLE
+    SHADE_EYE:     '#e02828',  // = A_RED
+    LURKER_BODY:   '#8a5a28',  // = M_CLAY
+    LURKER_EYE:    '#e86010',  // = A_ORANGE
+    CLASS_WARRIOR: '#d4a030',  // = L_GOLD
+    CLASS_ROGUE:   '#9030d0',  // = A_PURPLE
+    CLASS_WIZARD:  '#90a8c8',  // = L_BLUE
+    CLASS_CLERIC:  '#f0d020',  // = A_YELLOW
+    CLOAK_WARRIOR: '#2a1408',  // = D_BROWN
+    CLOAK_ROGUE:   '#18182a',  // = D_BLUE
+    CLOAK_WIZARD:  '#18182a',  // = D_BLUE
+    CLOAK_CLERIC:  '#1e1c18',  // = D_STONE
+    TIMING_MISS:   '#080408',  // = D_VOID
+    TIMING_WEAK:   '#8a3020',  // = M_BRICK
+    TIMING_HIT:    '#4a7030',  // = M_MOSS
+    TIMING_CRIT:   '#58c830',  // = L_LEAF
+});
 
 // ═══════════════════════════════════════════════════════
 //  ENEMY DEFINITIONS
@@ -20,13 +97,13 @@ const ENEMY_DEFS = {
     shade: {
         name:'Shade', hp:22, atk:8, xp:15,
         speed:1100, aggroRange:7, aggroSpeed:420,
-        color:'#4010a0', eyeColor:'#ff1020',
+        color:PALETTE.SHADE_BODY, eyeColor:PALETTE.SHADE_EYE,
         desc:'A wraith of living shadow.',
     },
     lurker: {
         name:'Cave Lurker', hp:55, atk:18, xp:35,
         speed:1900, aggroRange:3, aggroSpeed:1000,
-        color:'#5a4030', eyeColor:'#ff8010',
+        color:PALETTE.LURKER_BODY, eyeColor:PALETTE.LURKER_EYE,
         desc:'A massive stone-skinned predator.',
     },
 };
@@ -762,12 +839,48 @@ const HUD_H   = 40, HINT_H = 26;
 //  CANVAS
 // ═══════════════════════════════════════════════════════
 const canvas = document.getElementById('game-canvas');
-const ctx    = canvas.getContext('2d');
+let   ctx    = canvas.getContext('2d');
+
+// Logical (CSS-pixel) canvas dimensions — use these everywhere in game logic.
+// canvas.width / canvas.height are the physical pixel dimensions (cW * dpr, cH * dpr).
+let cW = 0, cH = 0;
+
+// Offscreen background canvas — caches all static (non-animated) tiles each frame only
+// when the camera moves or the map changes.  Animated tiles are drawn live on top.
+let bgCanvas = document.createElement('canvas');
+let bgCtx    = bgCanvas.getContext('2d');
+let bgDirty  = true;   // true → must rebuild before next render
+let _bgCamX  = -1, _bgCamY = -1; // last cam position baked into bgCanvas
 
 function resizeCanvas() {
-    canvas.width  = window.innerWidth;
-    canvas.height = window.innerHeight - HUD_H - HINT_H;
-    TS = Math.floor(Math.min(canvas.width / 15, canvas.height / 11));
+    const dpr = window.devicePixelRatio || 1;
+
+    // Logical (CSS-pixel) size
+    cW = window.innerWidth;
+    cH = window.innerHeight - HUD_H - HINT_H;
+
+    // Physical pixel size on the canvas element
+    canvas.width  = Math.round(cW * dpr);
+    canvas.height = Math.round(cH * dpr);
+
+    // Keep the CSS display size at logical pixels so layout isn't disturbed
+    canvas.style.width  = cW + 'px';
+    canvas.style.height = cH + 'px';
+
+    // Scale all subsequent draw calls so we always work in logical coords
+    ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.imageSmoothingEnabled = false; // pixel-perfect — never blur tile art
+
+    // Match the bg offscreen canvas to the same logical size (no DPR needed —
+    // we blit it to ctx which is already DPR-scaled)
+    bgCanvas.width  = cW;
+    bgCanvas.height = cH;
+    bgCtx = bgCanvas.getContext('2d');
+    bgCtx.imageSmoothingEnabled = false;
+    bgDirty = true;
+
+    TS = Math.floor(Math.min(cW / 15, cH / 11));
     TS = Math.max(32, Math.min(TS, 64));
     lightCanvas = null; // force recreation at new size
     invalidateTileCache(); // rebuild tile variants at new TS
@@ -888,6 +1001,7 @@ function changeMap(mapId, sx, sy) {
     player.prevX = player.renderX;  player.prevY = player.renderY;
     player.moveT = 1; player.isMoving = false;
     updateCamera();
+    bgDirty = true; // new map — force full bg cache rebuild
 
     document.getElementById('hud-location').textContent = currentMap.name;
 
@@ -917,10 +1031,10 @@ function updatePlayerAnim(dt) {
 }
 
 function updateCamera() {
-    const tx = player.renderX + TS/2 - canvas.width/2;
-    const ty = player.renderY + TS/2 - canvas.height/2;
-    cam.x = Math.round(Math.max(0, Math.min(tx, currentMap.w * TS - canvas.width)));
-    cam.y = Math.round(Math.max(0, Math.min(ty, currentMap.h * TS - canvas.height)));
+    const tx = player.renderX + TS/2 - cW/2;
+    const ty = player.renderY + TS/2 - cH/2;
+    cam.x = Math.round(Math.max(0, Math.min(tx, currentMap.w * TS - cW)));
+    cam.y = Math.round(Math.max(0, Math.min(ty, currentMap.h * TS - cH)));
 }
 
 // ═══════════════════════════════════════════════════════
@@ -945,6 +1059,20 @@ function _mkTile() {
     return c;
 }
 
+// 2-colour checkerboard dither over a rectangular region.
+// col1 = even-position colour (dominant), col2 = odd-position colour.
+// offset (0|1) shifts the checkerboard phase by one pixel for directionality.
+// Intended for tile-cache builds (called once, not per frame).
+function dither2(c, bx, by, bw, bh, col1, col2, offset) {
+    const o = offset | 0;
+    for (let y = by; y < by + bh; y++) {
+        for (let x = bx; x < bx + bw; x++) {
+            c.fillStyle = (((x + y + o) & 1) === 0) ? col1 : col2;
+            c.fillRect(x, y, 1, 1);
+        }
+    }
+}
+
 function invalidateTileCache() { _tcTS = 0; }
 
 function ensureTileCache() {
@@ -956,270 +1084,470 @@ function ensureTileCache() {
 function _buildTileCache() {
     for (const k of Object.keys(_tc)) delete _tc[k];
     const T = TS, U = Math.max(1, Math.floor(T / 16));
+    const P = PALETTE; // shorthand
 
-    // ─── GRASS  8 variants ─────────────────────────────
+    // ─────────────────────────────────────────────────────
+    // GRASS — 8 pixel-art variants, no blur, palette only
+    // Type A (v0-2,7): solid base + scattered 1px dew + L-blades
+    // Type B (v3-4):   dithered dark/mid patches + cross flowers
+    // Type C (v5):     dry — dithered mid/sand + crack marks
+    // Type D (v6):     dense dark — dark base + extra blades
+    // ─────────────────────────────────────────────────────
     for (let v = 0; v < 8; v++) {
         const can = _mkTile(), c = can.getContext('2d');
         const rng = _rng(v * 37 + 5);
         const isDry  = v === 5, isDark = v === 6;
-        const base1  = isDry ? '#4a6818' : isDark ? '#2c5816' : '#388828';
-        const base2  = isDry ? '#547020' : isDark ? '#347220' : '#3c8c2c';
-        // Organic scatter base — no visible grid
+        const base1  = isDry ? P.M_SAND    : isDark ? P.D_GREEN  : P.M_FOREST;
+        const base2  = isDry ? P.L_STONE   : isDark ? P.M_FOREST : P.M_MOSS;
+        // ── Solid base ──────────────────────────────────
         c.fillStyle = base1; c.fillRect(0, 0, T, T);
-        c.fillStyle = base2;
-        for (let i = 0; i < 28; i++) {
-            const sw = Math.floor(rng() * U * 5 + U * 2);
-            const sh = Math.floor(rng() * U * 4 + U * 2);
-            c.fillRect(Math.floor(rng() * (T - sw)), Math.floor(rng() * (T - sh)), sw, sh);
+
+        // ── Type B / C: dithered secondary patch ─────────
+        if (v === 3 || v === 4) {
+            // Type B — dither dark/mid green in irregular patches
+            for (let i = 0; i < 6; i++) {
+                const px2 = Math.floor(rng()*(T-U*6)), py2 = Math.floor(rng()*(T-U*6));
+                const pw = Math.floor(rng()*U*8+U*3),  ph = Math.floor(rng()*U*6+U*2);
+                dither2(c, px2, py2, Math.min(pw,T-px2), Math.min(ph,T-py2), P.D_GREEN, P.M_FOREST, v);
+            }
+        } else if (v === 5) {
+            // Type C — dither mid/sand across full tile
+            dither2(c, 0, 0, T, T, P.M_SAND, P.L_STONE, 0);
+        } else {
+            // Type A / D — scattered secondary colour blobs
+            c.fillStyle = base2;
+            for (let i = 0; i < 18; i++) {
+                const sw = Math.floor(rng()*U*4+U), sh = Math.floor(rng()*U*3+U);
+                c.fillRect(Math.floor(rng()*(T-sw)), Math.floor(rng()*(T-sh)), sw, sh);
+            }
         }
-        // Highlight scatter + tufts
-        c.fillStyle = isDry ? '#7a9030' : isDark ? '#3a8020' : '#48a834';
-        for (let i = 0; i < (v === 4 ? 6 : 3); i++)
-            c.fillRect(Math.floor(rng() * (T - U*2)), Math.floor(rng() * (T - U*2)), U, U);
-        c.fillStyle = isDry ? '#6a8828' : isDark ? '#2a7818' : '#56b840';
-        for (let i = 0; i < (v === 4 ? 5 : 2); i++)
-            c.fillRect(Math.floor(rng()*(T-U*2)), Math.floor(rng()*(T-U*5)), U, U*3);
-        // Per-variant decoration
+
+        // ── Dew / highlight scatter (1-px pixels) ────────
+        const hiCol = isDry ? P.L_STONE : isDark ? P.M_MOSS : P.L_LEAF;
+        const hiCount = isDark ? 8 : (v === 3 || v === 4) ? 5 : 6;
+        c.fillStyle = hiCol;
+        for (let i = 0; i < hiCount; i++)
+            c.fillRect(Math.floor(rng()*(T-U*2)+U), Math.floor(rng()*(T-U*2)+U), 1, 1);
+
+        // ── L-shaped grass blades (2-px) ─────────────────
+        const bladeCol = isDry ? P.M_CLAY : isDark ? P.D_GREEN : P.M_FOREST;
+        c.fillStyle = bladeCol;
+        for (let i = 0; i < 4; i++) {
+            const bx2 = Math.floor(rng()*(T-U*4)+U), by2 = Math.floor(rng()*(T-U*5)+U);
+            c.fillRect(bx2, by2, 1, U*2);        // vertical stroke
+            c.fillRect(bx2+1, by2, 1, 1);        // horizontal foot (L shape)
+        }
+        // ── Per-variant pixel-art detail ─────────────────
         switch (v) {
-            case 1: { // wildflowers — 2 four-petal flowers
+            case 1: { // Type A — small cross flowers (2 colours)
                 for (let f = 0; f < 2; f++) {
                     const fx = Math.floor(rng()*(T-U*6)+U*3), fy = Math.floor(rng()*(T-U*6)+U*3);
-                    const fc = f ? '#e87870' : '#e8d030';
+                    const fc = f ? P.A_RARE : P.A_YELLOW;
                     c.fillStyle = fc;
-                    c.fillRect(fx-U, fy, U, U); c.fillRect(fx+U, fy, U, U);
-                    c.fillRect(fx, fy-U, U, U); c.fillRect(fx, fy+U, U, U);
-                    c.fillStyle = '#ffffc0'; c.fillRect(fx, fy, U, U);
+                    c.fillRect(fx-1, fy, 1, 1); c.fillRect(fx+1, fy, 1, 1);
+                    c.fillRect(fx, fy-1, 1, 1); c.fillRect(fx, fy+1, 1, 1);
+                    c.fillStyle = P.L_WHITE; c.fillRect(fx, fy, 1, 1);
                 }
                 break;
             }
-            case 2: { // pebbles — small flat stones with highlights
-                for (let p = 0; p < 6; p++) {
-                    const px2 = Math.floor(rng()*(T-U*3)), py2 = Math.floor(rng()*(T-U*2));
-                    c.fillStyle = p%2 ? '#7a7868' : '#6e6c5a';
+            case 2: { // Type A — pebbles: 2-px rect, bright top, dark bottom
+                for (let p = 0; p < 5; p++) {
+                    const px2 = Math.floor(rng()*(T-U*3)+U), py2 = Math.floor(rng()*(T-U*2)+U);
+                    c.fillStyle = p%2 ? P.M_STONE : P.M_CLAY;
                     c.fillRect(px2, py2, U*2, U);
-                    c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(px2, py2, U*2, 1);
-                    c.fillStyle = 'rgba(0,0,0,0.18)';       c.fillRect(px2, py2+U-1, U*2, 1);
+                    c.fillStyle = P.L_STONE; c.fillRect(px2, py2, U*2, 1);       // hi
+                    c.fillStyle = P.D_STONE; c.fillRect(px2, py2+U-1, U*2, 1);   // shadow
                 }
                 break;
             }
-            case 3: { // mushroom — stem + cap + dot highlights
+            case 3: { // Type B — mushroom (solid palette colors)
                 const mx = Math.floor(T*0.37), my = Math.floor(T*0.44);
-                c.fillStyle = '#c8a860'; c.fillRect(mx, my, U*2, U*3);
-                c.fillStyle = '#c83820'; c.fillRect(mx-U, my-U*2, U*4, U*2);
-                c.fillStyle = '#e05038'; c.fillRect(mx, my-U*2, U, U);
-                c.fillStyle = 'rgba(255,255,255,0.75)';
-                c.fillRect(mx+U, my-U*2, U, U); c.fillRect(mx-U+1, my-U, U, U);
-                // second small mushroom
-                const mx2 = Math.floor(T*0.62), my2 = Math.floor(T*0.56);
-                c.fillStyle = '#c8a860'; c.fillRect(mx2, my2, U, U*2);
-                c.fillStyle = '#d04828'; c.fillRect(mx2-U, my2-U, U*3, U);
+                c.fillStyle = P.S_MID;  c.fillRect(mx, my, U*2, U*3);           // stem
+                c.fillStyle = P.M_BRICK; c.fillRect(mx-U, my-U*2, U*4, U*2);   // cap
+                c.fillStyle = P.L_WHITE; c.fillRect(mx+U, my-U*2, 1, 1);       // spot
+                c.fillRect(Math.floor(mx-U*.5), my-U, 1, 1);
                 break;
             }
-            case 4: { // dense — extra dark blades + slight darkening
-                c.fillStyle = 'rgba(0,0,0,0.06)'; c.fillRect(0, 0, T, T);
-                c.fillStyle = '#2a6010';
-                for (let i = 0; i < 5; i++)
-                    c.fillRect(Math.floor(rng()*(T-U)), Math.floor(rng()*(T-U*4)), U, U*2);
+            case 4: { // Type B — extra dark blade clusters
+                c.fillStyle = P.D_GREEN;
+                for (let i = 0; i < 6; i++) {
+                    const bx2 = Math.floor(rng()*(T-2)), by2 = Math.floor(rng()*(T-U*4));
+                    c.fillRect(bx2, by2, 1, U*2);
+                }
                 break;
             }
-            case 5: { // dry — warm tint + cracked earth patch
-                c.fillStyle = 'rgba(160,100,0,0.10)'; c.fillRect(0, 0, T, T);
+            case 5: { // Type C — cracked earth patch + sparse pixels
                 const cpx = Math.floor(rng()*T*0.5+T*0.2), cpy = Math.floor(rng()*T*0.4+T*0.3);
-                c.fillStyle = '#5a4010'; c.fillRect(cpx, cpy, U*3, U*2);
-                c.fillStyle = 'rgba(255,255,255,0.10)'; c.fillRect(cpx, cpy, U*3, 1);
-                // Dry crack line
-                c.fillStyle = 'rgba(0,0,0,0.20)';
-                for (let i = 0; i < 6; i++) c.fillRect(cpx+i, cpy+i%3, 1, 1);
+                c.fillStyle = P.M_CLAY; c.fillRect(cpx, cpy, U*3, U);           // crack patch
+                c.fillStyle = P.D_BROWN;
+                for (let i = 0; i < 4; i++) c.fillRect(cpx+i, cpy, 1, 1);      // crack dots
                 break;
             }
-            case 6: { // mossy — dark wet oval + bright green dots
-                c.fillStyle = 'rgba(8,68,8,0.30)';
-                c.beginPath(); c.ellipse(T/2, T/2, T*0.32, T*0.24, 0, 0, Math.PI*2); c.fill();
-                c.fillStyle = '#1a8020';
-                for (let i = 0; i < 5; i++)
-                    c.fillRect(Math.floor(T*0.22+rng()*T*0.56), Math.floor(T*0.22+rng()*T*0.56), U, U);
+            case 6: { // Type D — dense, extra dark short blades
+                c.fillStyle = P.D_GREEN;
+                for (let i = 0; i < 8; i++) {
+                    const bx2 = Math.floor(rng()*(T-2)), by2 = Math.floor(rng()*(T-U*3));
+                    c.fillRect(bx2, by2, 1, U*2+1);
+                }
                 break;
             }
-            case 7: { // clover — 2 three-leaf clusters
+            case 7: { // Type A — clover: 3 arcs + bright center pixel
                 for (let cl = 0; cl < 2; cl++) {
                     const clx = Math.floor(rng()*(T-U*8)+U*4), cly = Math.floor(rng()*(T-U*8)+U*4);
-                    c.fillStyle = '#38c820';
-                    c.beginPath(); c.arc(clx,      cly-U*1.2, U*1.1, 0, Math.PI*2); c.fill();
-                    c.beginPath(); c.arc(clx-U*1.2, cly+U*.7, U*1.1, 0, Math.PI*2); c.fill();
-                    c.beginPath(); c.arc(clx+U*1.2, cly+U*.7, U*1.1, 0, Math.PI*2); c.fill();
-                    c.fillStyle = '#60e840';
-                    c.beginPath(); c.arc(clx, cly, Math.max(1,U*.7), 0, Math.PI*2); c.fill();
-                    c.fillStyle = '#38c820';
+                    c.fillStyle = P.L_LEAF;
+                    c.beginPath(); c.arc(clx,        cly-U*1.2, U*1.1, 0, Math.PI*2); c.fill();
+                    c.beginPath(); c.arc(clx-U*1.2,  cly+U*.7,  U*1.1, 0, Math.PI*2); c.fill();
+                    c.beginPath(); c.arc(clx+U*1.2,  cly+U*.7,  U*1.1, 0, Math.PI*2); c.fill();
+                    c.fillStyle = P.L_WHITE;
+                    c.fillRect(clx, cly, 1, 1);
                 }
                 break;
             }
         }
-        // Soft blur pass to smooth scatter edges into organic texture
-        const blurred = _mkTile(), bc2 = blurred.getContext('2d');
-        bc2.filter = 'blur(0.6px)';
-        bc2.drawImage(can, 0, 0);
-        _tc[`g${v}`] = blurred;
+        // No blur — pixel art must stay crisp
+        _tc[`g${v}`] = can;
     }
 
-    // ─── PATH  4 variants ──────────────────────────────
+    // ─────────────────────────────────────────────────────
+    // PATH — 4 variants, beveled cobblestones
+    // Each stone: flat fill, 1px L_STONE highlight top-left,
+    // 1px D_STONE shadow bottom-right. Mortar: 1px D_BROWN lines.
+    // ─────────────────────────────────────────────────────
     for (let v = 0; v < 4; v++) {
         const can = _mkTile(), c = can.getContext('2d');
-        const gap = Math.max(1, Math.floor(T/20)), half = Math.floor(T/2);
-        const mortars = ['#8a7030','#7a6028','#787a38','#8a7828'];
-        c.fillStyle = mortars[v]; c.fillRect(0, 0, T, T);
-        if (v === 2) { // mossy mortar lines
-            c.fillStyle = 'rgba(40,80,8,0.45)';
-            c.fillRect(0, half-1, T, 2); c.fillRect(half-1, 0, 2, T);
+        const gap = Math.max(1, Math.floor(T/18)), half = Math.floor(T/2);
+        // Mortar base
+        c.fillStyle = P.M_CLAY; c.fillRect(0, 0, T, T);
+        // Mossy variant: dither M_MOSS into mortar lines
+        if (v === 2) {
+            c.fillStyle = P.M_MOSS;
+            c.fillRect(0, half-1, T, 1); c.fillRect(half-1, 0, 1, T);
         }
-        const stoneColorSets = [
-            ['#b49040','#c4a850','#a87c30','#bc9848'],
-            ['#a08030','#b08840','#986828','#ac8438'],
-            ['#9a9030','#aaA040','#8c8028','#b0a840'],
-            ['#c0a840','#d0b850','#b09838','#c8b04a'],
-        ];
-        const sc = stoneColorSets[v];
-        [[gap,gap],[half+gap,gap],[gap,half+gap],[half+gap,half+gap]].forEach(([ox,oy],i) => {
+        // Stone colour per variant (all from M_SAND / L_STONE)
+        const stoneCols = [P.M_SAND, P.L_STONE, P.M_SAND, P.L_STONE];
+        const sc = stoneCols[v];
+        [[gap,gap],[half+gap,gap],[gap,half+gap],[half+gap,half+gap]].forEach(([ox,oy]) => {
             const sw = half-gap*2, sh = half-gap*2;
-            c.fillStyle = sc[i]; c.fillRect(ox, oy, sw, sh);
-            c.fillStyle = 'rgba(255,255,255,0.20)'; c.fillRect(ox, oy, sw, 1);
-            c.fillStyle = 'rgba(0,0,0,0.22)';       c.fillRect(ox, oy+sh-1, sw, 1);
+            // Flat fill
+            c.fillStyle = sc; c.fillRect(ox, oy, sw, sh);
+            // Bevel: bright top + left edges
+            c.fillStyle = P.L_WHITE;
+            c.fillRect(ox, oy, sw, 1);         // top highlight
+            c.fillRect(ox, oy, 1, sh);         // left highlight
+            // Bevel: dark bottom + right edges
+            c.fillStyle = P.D_STONE;
+            c.fillRect(ox, oy+sh-1, sw, 1);   // bottom shadow
+            c.fillRect(ox+sw-1, oy, 1, sh);   // right shadow
         });
-        if (v === 1) { // hairline cracks
-            c.fillStyle = 'rgba(0,0,0,0.40)';
-            for (let i = 0; i < 8; i++) c.fillRect(gap+1+i, gap+1+i, 1, 1);
-            for (let i = 0; i < 6; i++) c.fillRect(half+gap+2+i, half+gap+4+i, 1, 1);
-        }
-        if (v === 3) { // worn center highlight
-            c.fillStyle = 'rgba(255,255,255,0.06)';
-            c.fillRect(Math.floor(T*0.3), Math.floor(T*0.3), Math.floor(T*0.4), Math.floor(T*0.4));
+        if (v === 1 || v === 3) { // hairline cracks — 2-3 diagonal 1px dots
+            c.fillStyle = P.D_BROWN;
+            for (let i = 0; i < 4; i++) c.fillRect(gap+2+i, gap+2+i, 1, 1);
+            for (let i = 0; i < 3; i++) c.fillRect(half+gap+3+i, half+gap+3+i, 1, 1);
         }
         _tc[`p${v}`] = can;
     }
 
-    // ─── WALL  4 variants × light/dark ─────────────────
-    for (let dk = 0; dk < 2; dk++) {
-        const mortar    = dk ? '#120e18' : '#4a3828';
-        const accentTop = dk ? '#1a1422' : '#5a4432';
-        const brickSets = dk ? [
-            ['#1c1428','#221830','#181222'],
-            ['#1a1226','#1e1530','#161020'],
-            ['#1c1428','#221830','#181222'],
-            ['#201630','#1e1428','#1a1228'],
-        ] : [
-            ['#6a4830','#7a5838','#5c3c24'],
-            ['#5c3c20','#6a4828','#503418'],
-            ['#6a4830','#7a5838','#5c3c24'],
-            ['#724830','#806040','#5a3820'],
-        ];
-        for (let v = 0; v < 4; v++) {
-            const can = _mkTile(), c = can.getContext('2d');
-            const rng = _rng(v*53 + (dk?1000:0) + 13);
-            const bH  = Math.floor(T/4), bW = Math.floor(T/2);
-            c.fillStyle = mortar;    c.fillRect(0, 0, T, T);
-            c.fillStyle = accentTop; c.fillRect(0, 0, T, Math.max(1,Math.floor(T*0.06)));
-            const bc = brickSets[v];
-            for (let row = 0; row < 4; row++) {
-                const by = Math.floor(row*bH), off = (row%2)*Math.floor(bW/2);
-                for (let col = -1; col < 3; col++) {
-                    const bx = Math.floor(col*bW+off);
-                    const x1 = Math.max(1,bx+1), x2 = Math.min(T-1,bx+bW-1);
-                    const y1 = by+1, y2 = by+bH-1;
-                    if (x2<=x1||y2<=y1) continue;
-                    c.fillStyle = bc[(row+col+3)%bc.length]; c.fillRect(x1,y1,x2-x1,y2-y1);
-                    c.fillStyle = 'rgba(255,255,255,0.08)';   c.fillRect(x1,y1,x2-x1,1);
-                    c.fillStyle = 'rgba(0,0,0,0.20)';          c.fillRect(x1,y2-1,x2-x1,1);
-                }
+    // ─────────────────────────────────────────────────────
+    // WALL — 3 types × 4 variants
+    //   wex0-3  exterior stone (village)
+    //   win0-3  interior wood panel (buildings)
+    //   wd0-3   dungeon hewn rock
+    // ─────────────────────────────────────────────────────
+
+    // ── Exterior stone (rough-cut, dithered mortar seams) ─
+    for (let v = 0; v < 4; v++) {
+        const can = _mkTile(), c = can.getContext('2d');
+        const rng = _rng(v*53+13);
+        const bH = Math.floor(T/4), bW = Math.floor(T/2);
+        c.fillStyle = P.M_CLAY; c.fillRect(0, 0, T, T); // mortar
+        for (let row = 0; row < 4; row++) {
+            const by = Math.floor(row*bH), off = (row%2)*Math.floor(bW/2);
+            for (let col = -1; col < 3; col++) {
+                const bx = Math.floor(col*bW+off);
+                const x1 = Math.max(1,bx+1), x2 = Math.min(T-1,bx+bW-1);
+                const y1 = by+1, y2 = by+bH-1;
+                if (x2<=x1||y2<=y1) continue;
+                c.fillStyle = (row+col)%2===0 ? P.M_STONE : P.L_STONE;
+                c.fillRect(x1, y1, x2-x1, y2-y1);
+                c.fillStyle = P.L_WHITE; c.fillRect(x1, y1, x2-x1, 1);         // top hi
+                c.fillStyle = P.D_STONE; c.fillRect(x1, y2-1, x2-x1, 1);       // bottom sh
             }
-            // Overlays
-            if (v===1) { // aged — darker lower half
-                c.fillStyle = `rgba(0,0,0,${dk?'0.10':'0.12'})`; c.fillRect(0,Math.floor(T*.5),T,Math.floor(T*.5));
-            } else if (v===2) { // mossy streak + dots near base
-                c.fillStyle = dk?'rgba(5,50,5,0.32)':'rgba(10,70,10,0.22)';
-                c.fillRect(0, Math.floor(T*.58), T, Math.floor(T*.42));
-                c.fillStyle = dk?'#062808':'#1a5010';
-                for (let i=0;i<5;i++) c.fillRect(Math.floor(rng()*T), Math.floor(T*.65+rng()*T*.30), U, U);
-            } else if (v===3&&!dk) { // crumbling top — debris
-                c.fillStyle = mortar; c.fillRect(0,0,T,Math.floor(T*.08));
-                c.fillStyle = bc[0];
-                for (let i=0;i<5;i++) c.fillRect(Math.floor(rng()*(T-U*2)), Math.floor(rng()*T*.14), U*2, U);
-            }
-            _tc[dk ? `wd${v}` : `wl${v}`] = can;
         }
+        if (v===1) { // occasional moss pixel on lower stones
+            c.fillStyle = P.M_MOSS;
+            for (let i=0;i<3;i++) c.fillRect(Math.floor(rng()*T), Math.floor(T*.6+rng()*T*.3), 1, 1);
+        }
+        if (v===3) { // dithered dark patch — age staining lower quarter
+            dither2(c, 0, Math.floor(T*.75), T, Math.floor(T*.25), P.M_STONE, P.D_STONE, 0);
+        }
+        _tc[`wex${v}`] = can;
+    }
+
+    // ── Interior wood panel (vertical 6px planks) ────────
+    for (let v = 0; v < 4; v++) {
+        const can = _mkTile(), c = can.getContext('2d');
+        const rng = _rng(v*59+700);
+        const plankW = Math.max(5, Math.floor(T/6));
+        const nPlanks = Math.ceil(T/plankW)+1;
+        // Alternating plank brightness (3 tones)
+        const plankCols = [P.M_CLAY, P.S_DARK, P.S_MID];
+        for (let i = 0; i < nPlanks; i++) {
+            const px2 = i*plankW;
+            c.fillStyle = plankCols[i%3]; c.fillRect(px2, 0, plankW-1, T);
+            // Subtle brightness variation: 1px bright strip at top
+            c.fillStyle = P.L_PARCH; c.fillRect(px2, 0, plankW-1, 1);
+            // 1px dark seam between planks
+            c.fillStyle = P.D_BROWN; c.fillRect(px2+plankW-1, 0, 1, T);
+            // Nail pixel near top of each plank
+            c.fillStyle = P.D_STONE;
+            c.fillRect(px2+Math.floor(plankW/2), Math.floor(T*0.08), 1, 1);
+        }
+        // v=2: horizontal cross-beam strip across mid tile
+        if (v===2) {
+            const beamY = Math.floor(T*0.45), beamH = Math.max(3,Math.floor(T*0.10));
+            c.fillStyle = P.D_BROWN; c.fillRect(0, beamY, T, beamH);
+            c.fillStyle = P.M_CLAY;  c.fillRect(0, beamY, T, 1);     // beam top face
+        }
+        _tc[`win${v}`] = can;
+    }
+
+    // ── Dungeon hewn rock ─────────────────────────────────
+    for (let v = 0; v < 4; v++) {
+        const can = _mkTile(), c = can.getContext('2d');
+        const rng = _rng(v*53+1000);
+        c.fillStyle = P.D_VOID; c.fillRect(0, 0, T, T);
+        // Dithered rock texture: D_BLUE into D_VOID
+        dither2(c, 0, 0, T, T, P.D_VOID, P.D_BLUE, v&1);
+        // Faint highlight near top — torch-light catch
+        dither2(c, 0, 0, T, Math.max(2,Math.floor(T*.12)), P.D_BLUE, P.M_TEAL, 0);
+        // Irregular rock face chips (3-4 pixels)
+        c.fillStyle = P.M_TEAL;
+        for (let i=0;i<4;i++)
+            c.fillRect(Math.floor(rng()*T), Math.floor(rng()*T), 1, 1);
+        if (v===1) { // moss trickle — a vertical line of M_TEAL pixels
+            const mx2 = Math.floor(rng()*T);
+            for (let y2=Math.floor(T*.5);y2<T;y2+=2) c.fillRect(mx2, y2, 1, 1);
+        }
+        _tc[`wd${v}`] = can;
     }
 
     // ─── FLOOR  4 variants × light/dark ────────────────
-    const floorColSets = [
-        [['#8a5a28','#7a4e20','#9a6832'],['#231830','#2e2040','#1a1028']],  // v0 standard
-        [['#9a6a38','#8a5e28','#aa783a'],['#281a38','#322444','#1e142c']],  // v1 worn/lighter
-        [['#8a5a28','#7a4e20','#9a6832'],['#231830','#2e2040','#1a1028']],  // v2 stained (overlay)
-        [['#7a4a18','#6a3e10','#8a5820'],['#1a1028','#241838','#120820']],  // v3 dark
+    // Light (fl): warm wood planks — S_DARK / S_MID / M_CLAY
+    // Dark  (fd): dungeon stone   — D_BLUE / M_TEAL / M_SLATE
+    const floorLight = [
+        [P.S_DARK, P.S_MID,  P.M_CLAY],  // v0 standard warm
+        [P.M_CLAY, P.S_DARK, P.S_MID ],  // v1 worn/shifted
+        [P.S_DARK, P.S_MID,  P.M_CLAY],  // v2 stained
+        [P.S_DARK, P.M_CLAY, P.S_DARK],  // v3 dark/old
+    ];
+    const floorDark = [
+        [P.D_BLUE,  P.M_TEAL,  P.M_SLATE], // v0
+        [P.M_TEAL,  P.D_BLUE,  P.M_SLATE], // v1
+        [P.D_BLUE,  P.M_TEAL,  P.M_SLATE], // v2
+        [P.M_SLATE, P.D_BLUE,  P.M_TEAL ], // v3
     ];
     for (let dk = 0; dk < 2; dk++) {
+        const colSets = dk ? floorDark : floorLight;
         for (let v = 0; v < 4; v++) {
             const can = _mkTile(), c = can.getContext('2d');
             const rng = _rng(v*59+(dk?2000:0)+17);
-            const cols   = floorColSets[v][dk];
+            const cols   = colSets[v];
             const plankH = Math.floor(T/3);
             const jointX = v%2===0 ? Math.floor(T*.42) : Math.floor(T*.60);
             for (let i = 0; i < 3; i++) {
-                const py2 = Math.floor(i*plankH), h = i===2?T-2*plankH:plankH;
+                const py2 = Math.floor(i*plankH), h = i===2 ? T-2*plankH : plankH;
                 c.fillStyle = cols[i]; c.fillRect(0, py2, T, h);
-                c.fillStyle = 'rgba(255,255,255,0.07)'; c.fillRect(0, py2, T, 1);
-                c.fillStyle = 'rgba(0,0,0,0.15)';       c.fillRect(0, py2+h-1, T, 1);
-                c.fillStyle = 'rgba(0,0,0,0.18)';       c.fillRect(jointX, py2, 1, h);
-                if (v===1) { // scratches
-                    c.fillStyle = 'rgba(0,0,0,0.10)';
-                    for (let s=0;s<2;s++)
-                        c.fillRect(Math.floor(rng()*T*.7+T*.1), py2+Math.floor(rng()*(h-2)+1), Math.floor(rng()*T*.35+T*.1), 1);
-                } else if (v===2&&i===1) { // stain patch on middle plank
-                    c.fillStyle = 'rgba(0,0,0,0.16)';
-                    c.fillRect(Math.floor(T*.15), py2+2, Math.floor(T*.48), h-4);
+                c.fillStyle = dk ? P.M_TEAL  : P.L_PARCH; c.fillRect(0, py2, T, 1);       // top hi
+                c.fillStyle = dk ? P.D_VOID  : P.D_BROWN; c.fillRect(0, py2+h-1, T, 1);   // bottom sh
+                c.fillStyle = dk ? P.D_VOID  : P.D_BROWN; c.fillRect(jointX, py2, 1, h);   // joint
+            }
+            if (v===1) { // v1: scratch lines
+                c.fillStyle = dk ? P.D_VOID : P.D_BROWN;
+                for (let s=0;s<2;s++) {
+                    const sx = Math.floor(rng()*T*.7+T*.1);
+                    c.fillRect(sx, Math.floor(rng()*(plankH-2)+1), Math.floor(rng()*T*.35+T*.1), 1);
                 }
+            } else if (v===2) { // v2: stain patch on mid plank
+                c.fillStyle = dk ? P.D_VOID : P.S_DARK;
+                c.fillRect(Math.floor(T*.15), plankH+2, Math.floor(T*.48), plankH-4);
             }
             _tc[dk?`fd${v}`:`fl${v}`] = can;
         }
     }
 
-    // ─── TREE  4 variants (transparent bg) ─────────────
-    const treeCfg = [
-        {r:.38,cx:.50,cy:.38,dense:false,wide:false},
-        {r:.42,cx:.50,cy:.40,dense:true, wide:false},
-        {r:.34,cx:.50,cy:.44,dense:false,wide:true },
-        {r:.30,cx:.50,cy:.31,dense:false,wide:false},
-    ];
+    // ─── TREE  4 variants (transparent bg — drawn over grass) ─
     for (let v = 0; v < 4; v++) {
         const can = _mkTile(), c = can.getContext('2d');
-        const cfg = treeCfg[v];
+        const cfg = [
+            {r:.38,cx:.50,cy:.38,dense:false,wide:false},
+            {r:.42,cx:.50,cy:.40,dense:true, wide:false},
+            {r:.34,cx:.50,cy:.44,dense:false,wide:true },
+            {r:.30,cx:.50,cy:.31,dense:false,wide:false},
+        ][v];
         const cx2 = Math.floor(T*cfg.cx), cy2 = Math.floor(T*cfg.cy), r = T*cfg.r;
-        const tW  = cfg.wide?Math.floor(T*.15):v===3?Math.floor(T*.08):Math.floor(T*.12);
-        const tH  = v===3?Math.floor(T*.34):Math.floor(T*.22);
-        // Shadow
-        c.fillStyle = 'rgba(0,0,0,0.32)';
-        c.beginPath(); c.ellipse(Math.floor(T*.52),Math.floor(T*.68),T*.32,T*.11,0,0,Math.PI*2); c.fill();
-        // Trunk
-        c.fillStyle = '#4a2808'; c.fillRect(Math.floor(T/2-tW/2), Math.floor(T*.44), tW, tH);
-        c.fillStyle = '#6e3e14'; c.fillRect(Math.floor(T/2-tW/2+tW*.25), Math.floor(T*.44), Math.floor(tW*.4), tH);
-        // Canopy layers
-        const outer = cfg.dense?'#154008':'#1a4a08';
-        const mid   = cfg.dense?'#225814':'#2a6814';
-        const hi    = cfg.dense?'#306018':'#3a8020';
-        c.fillStyle = outer; c.beginPath(); c.arc(cx2,cy2,r,0,Math.PI*2); c.fill();
-        c.fillStyle = mid;   c.beginPath(); c.arc(cx2,cy2-Math.floor(r*.06),Math.floor(r*.84),0,Math.PI*2); c.fill();
-        c.fillStyle = hi;    c.beginPath(); c.arc(cx2-Math.floor(r*.18),cy2-Math.floor(r*.20),Math.floor(r*.62),0,Math.PI*2); c.fill();
-        c.fillStyle = '#50a030'; c.fillRect(Math.floor(cx2-r*.38),Math.floor(cy2-r*.44),Math.floor(r*.28),Math.floor(r*.22));
-        if (cfg.dense) { // extra perimeter clusters
-            c.fillStyle = outer;
+        const tW = cfg.wide ? Math.floor(T*.15) : v===3 ? Math.floor(T*.08) : Math.floor(T*.12);
+        const tH = v===3 ? Math.floor(T*.34) : Math.floor(T*.22);
+        // Ground shadow: dithered D_STONE checkerboard under canopy footprint
+        const shY = Math.floor(T*.65), shW = Math.floor(T*.60), shH = Math.floor(T*.10);
+        c.fillStyle = P.D_STONE;
+        for (let dy = 0; dy < shH; dy++)
+            for (let dx = 0; dx < shW; dx++)
+                if (!((dx+dy)&1)) c.fillRect(Math.floor(T*.20)+dx, shY+dy, 1, 1);
+        // Trunk (3-color flat strips: D_BROWN base, M_CLAY center highlight)
+        c.fillStyle = P.D_BROWN; c.fillRect(Math.floor(T/2-tW/2), Math.floor(T*.44), tW, tH);
+        c.fillStyle = P.M_CLAY;  c.fillRect(Math.floor(T/2-tW/2+Math.floor(tW*.25)), Math.floor(T*.44), Math.floor(tW*.40), tH);
+        // Canopy layers (3 concentric arcs, each inset and shifted)
+        c.fillStyle = P.D_GREEN;
+        c.beginPath(); c.arc(cx2, cy2, r, 0, Math.PI*2); c.fill();
+        c.fillStyle = P.M_FOREST;
+        c.beginPath(); c.arc(cx2, cy2-Math.floor(r*.06), Math.floor(r*.84), 0, Math.PI*2); c.fill();
+        c.fillStyle = P.M_MOSS;
+        c.beginPath(); c.arc(cx2-Math.floor(r*.18), cy2-Math.floor(r*.20), Math.floor(r*.62), 0, Math.PI*2); c.fill();
+        // Bright specular patch upper-left + 2px highlight pixel
+        c.fillStyle = P.L_LEAF;
+        c.fillRect(Math.floor(cx2-r*.38), Math.floor(cy2-r*.44), Math.floor(r*.28), Math.floor(r*.20));
+        c.fillStyle = P.L_WHITE;
+        c.fillRect(Math.floor(cx2-r*.32), Math.floor(cy2-r*.40), 2, 2);
+        if (cfg.dense) { // extra perimeter bump clusters
+            c.fillStyle = P.D_GREEN;
             for (let i=0;i<5;i++) {
                 const a=(i/5)*Math.PI*2;
                 c.beginPath(); c.arc(cx2+Math.cos(a)*r*.65,cy2+Math.sin(a)*r*.5,r*.22,0,Math.PI*2); c.fill();
             }
         }
         if (cfg.wide) { // lateral side lobes
-            c.fillStyle = mid;
+            c.fillStyle = P.M_FOREST;
             c.beginPath(); c.arc(cx2-Math.floor(r*.55),cy2+Math.floor(r*.12),r*.28,0,Math.PI*2); c.fill();
             c.beginPath(); c.arc(cx2+Math.floor(r*.55),cy2+Math.floor(r*.12),r*.28,0,Math.PI*2); c.fill();
         }
         _tc[`tr${v}`] = can;
+    }
+
+    // ── CEILING  4 variants (interior top-row overhead) ──────
+    // Rendered when tile===WALL && returnMap && !dark && ty===0
+    // Dark stone dither base + wooden crossbeam strip
+    for (let v = 0; v < 4; v++) {
+        const can = _mkTile(), c = can.getContext('2d');
+        const rng = _rng(v*71+3000);
+        dither2(c, 0, 0, T, T, P.D_STONE, P.D_VOID, v&1);       // stone base
+        const beamY = Math.floor(T*.38), beamH = Math.max(3, Math.floor(T*.18));
+        c.fillStyle = P.D_BROWN; c.fillRect(0, beamY, T, beamH);  // beam body
+        c.fillStyle = P.S_DARK;  c.fillRect(0, beamY, T, 1);      // beam top face (lit)
+        c.fillStyle = P.D_VOID;  c.fillRect(0, beamY+beamH-1, T, 1); // beam bottom shadow
+        c.fillStyle = P.D_VOID;  // knot/nail pixel
+        c.fillRect(Math.floor(rng()*T*.8+T*.1), beamY+Math.floor(beamH*.4), 2, 2);
+        _tc[`ceil${v}`] = can;
+    }
+
+    // ── WATER  4 animation frames (flipbook @ 8fps = 125ms/frame) ─
+    for (let f = 0; f < 4; f++) {
+        const can = _mkTile(), c = can.getContext('2d');
+        // Deep water base
+        c.fillStyle = P.M_SLATE; c.fillRect(0, 0, T, T);
+        // Mid shimmer band shifts position each frame
+        const bandY = Math.floor(T*.32 + f*1.5);
+        c.fillStyle = P.L_WATER; c.fillRect(0, bandY, T, Math.floor(T*.22));
+        // 3 wave stripes, colour alternates by frame parity
+        for (let i = 0; i < 3; i++) {
+            const wy = (Math.floor(T*.12 + i*(T/3.4) + f*2)) % T;
+            c.fillStyle = (i+f)%2===0 ? P.L_WATER : P.L_BLUE;
+            c.fillRect(Math.floor(T*.05), wy, Math.floor(T*.88), Math.max(1,Math.floor(T*.05)));
+        }
+        // Shimmer glint blinks on even frames
+        if ((f&1)===0) {
+            c.fillStyle = P.L_WHITE;
+            c.fillRect(Math.floor(T*.14), Math.floor(T*.18), 2, 1);
+            c.fillRect(Math.floor(T*.54), Math.floor(T*.42), 1, 1);
+        }
+        _tc[`wa${f}`] = can;
+    }
+
+    // ── TORCH  2 animation frames (transparent bg) ───────────
+    // Frame 'ta' = tall narrow flame  |  Frame 'tb' = wide squat flame
+    // Wall background is drawn separately by drawTorch() before compositing.
+    for (let f = 0; f < 2; f++) {
+        const can = _mkTile(), c = can.getContext('2d');
+        // Bracket: dark iron pole + lighter metal bands
+        c.fillStyle = P.D_STONE;
+        c.fillRect(Math.floor(T*.42), Math.floor(T*.34), Math.floor(T*.16), Math.floor(T*.36));
+        c.fillStyle = P.M_STONE;
+        c.fillRect(Math.floor(T*.38), Math.floor(T*.34), Math.floor(T*.24), Math.floor(T*.05));
+        c.fillRect(Math.floor(T*.38), Math.floor(T*.66), Math.floor(T*.24), Math.floor(T*.05));
+        // Flame via stacked palette rects (no ellipse/rgba)
+        const tcx = Math.floor(T*.50), tcy = Math.floor(T*.16);
+        if (f===0) { // tall narrow teardrop
+            c.fillStyle=P.A_RED;    c.fillRect(tcx-3, tcy+8, 6, 8);
+            c.fillStyle=P.A_ORANGE; c.fillRect(tcx-2, tcy+3, 5, 8);
+            c.fillStyle=P.A_YELLOW; c.fillRect(tcx-1, tcy,   3, 6);
+            c.fillStyle=P.L_WHITE;  c.fillRect(tcx,   tcy,   1, 3);
+        } else {     // wide squat teardrop
+            c.fillStyle=P.A_RED;    c.fillRect(tcx-4, tcy+7, 8, 7);
+            c.fillStyle=P.A_ORANGE; c.fillRect(tcx-3, tcy+3, 7, 7);
+            c.fillStyle=P.A_YELLOW; c.fillRect(tcx-1, tcy+1, 4, 5);
+            c.fillStyle=P.L_WHITE;  c.fillRect(tcx,   tcy+1, 2, 2);
+        }
+        _tc[f===0?'ta':'tb'] = can;
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//  BACKGROUND CACHE  — pre-bake all static tiles to bgCanvas
+// ═══════════════════════════════════════════════════════
+
+// Redirect the global `ctx` to bgCtx, draw all non-animated tiles, restore.
+// Called once per frame only when bgDirty is set (cam moved or map changed).
+function rebuildBgCanvas() {
+    // Resize if needed (e.g. after a resize event before the first render)
+    if (bgCanvas.width !== cW || bgCanvas.height !== cH) {
+        bgCanvas.width  = cW;
+        bgCanvas.height = cH;
+        bgCtx = bgCanvas.getContext('2d');
+        bgCtx.imageSmoothingEnabled = false;
+    }
+
+    // Clear
+    bgCtx.clearRect(0, 0, cW, cH);
+    if (currentMap.dark) {
+        bgCtx.fillStyle = PALETTE.MAP_DARK_BG;
+        bgCtx.fillRect(0, 0, cW, cH);
+    }
+
+    // Temporarily redirect the global ctx so all drawTile() calls go to bgCtx
+    const savedCtx = ctx;
+    ctx = bgCtx;
+
+    ensureTileCache();
+    const stx = Math.max(0, Math.floor(cam.x / TS));
+    const sty = Math.max(0, Math.floor(cam.y / TS));
+    const etx = Math.min(currentMap.w - 1, Math.ceil((cam.x + cW) / TS));
+    const ety = Math.min(currentMap.h - 1, Math.ceil((cam.y + cH) / TS));
+    for (let ty = sty; ty <= ety; ty++) {
+        for (let tx = stx; tx <= etx; tx++) {
+            const tile = currentMap.tiles[ty][tx];
+            if (ANIMATED_TILES.has(tile)) continue; // skip — drawn live each frame
+            drawTile(tile, tx * TS - cam.x, ty * TS - cam.y, tx, ty);
+        }
+    }
+
+    ctx = savedCtx; // restore main context
+    bgDirty = false;
+    _bgCamX = cam.x;
+    _bgCamY = cam.y;
+}
+
+// Draw only the animated tiles directly onto the main ctx each frame.
+function drawAnimatedTiles() {
+    ensureTileCache();
+    const stx = Math.max(0, Math.floor(cam.x / TS));
+    const sty = Math.max(0, Math.floor(cam.y / TS));
+    const etx = Math.min(currentMap.w - 1, Math.ceil((cam.x + cW) / TS));
+    const ety = Math.min(currentMap.h - 1, Math.ceil((cam.y + cH) / TS));
+    for (let ty = sty; ty <= ety; ty++) {
+        for (let tx = stx; tx <= etx; tx++) {
+            const tile = currentMap.tiles[ty][tx];
+            if (!ANIMATED_TILES.has(tile)) continue;
+            drawTile(tile, tx * TS - cam.x, ty * TS - cam.y, tx, ty);
+        }
     }
 }
 
@@ -1234,6 +1562,18 @@ function drawTile(tile, px, py, tx, ty) {
     switch (tile) {
         case TILE.GRASS: {
             ctx.drawImage(_tc[`g${(tx*7+ty*13)&7}`], ipx, ipy, S1, S1);
+            // Auto-tile edge blending: dithered 4px strip at grass→path/water boundaries
+            const stripW = Math.max(4, Math.floor(TS/8));
+            const blendNeighbors = [[tx,ty-1,0],[tx,ty+1,1],[tx-1,ty,2],[tx+1,ty,3]];
+            for (const [ntx,nty,dir] of blendNeighbors) {
+                const nt = currentMap.tiles[nty]?.[ntx];
+                if (nt!==TILE.PATH && nt!==TILE.WATER) continue;
+                const bCol = nt===TILE.WATER ? PALETTE.M_SLATE : PALETTE.M_CLAY;
+                if (dir===0) dither2(ctx, ipx, ipy,               TS, stripW, PALETTE.M_FOREST, bCol, 0);
+                if (dir===1) dither2(ctx, ipx, ipy+TS-stripW,     TS, stripW, PALETTE.M_FOREST, bCol, 1);
+                if (dir===2) dither2(ctx, ipx, ipy,               stripW, TS, PALETTE.M_FOREST, bCol, 0);
+                if (dir===3) dither2(ctx, ipx+TS-stripW, ipy,     stripW, TS, PALETTE.M_FOREST, bCol, 1);
+            }
             break;
         }
         case TILE.PATH: {
@@ -1247,7 +1587,13 @@ function drawTile(tile, px, py, tx, ty) {
         }
         case TILE.WALL: {
             const v = (tx*3+ty*11)&3;
-            ctx.drawImage(_tc[dark?`wd${v}`:`wl${v}`], ipx, ipy, S1, S1);
+            // Ceiling: interior top row gets overhead beam tile instead of wall face
+            if (!dark && currentMap.returnMap && ty === 0) {
+                ctx.drawImage(_tc[`ceil${v}`], ipx, ipy, S1, S1);
+                break;
+            }
+            const wk = dark ? `wd${v}` : currentMap.returnMap ? `win${v}` : `wex${v}`;
+            ctx.drawImage(_tc[wk], ipx, ipy, S1, S1);
             break;
         }
         case TILE.TREE: {
@@ -1256,8 +1602,8 @@ function drawTile(tile, px, py, tx, ty) {
             ctx.drawImage(_tc[`tr${tv}`], ipx, ipy, S1, S1);
             break;
         }
-        case TILE.WATER:    drawWater(px,py);    break;
-        case TILE.DOOR:     drawDoor(px,py);     break;
+        case TILE.WATER:    drawWater(px,py);        break;
+        case TILE.DOOR:     drawDoor(px,py,tx,ty); break;
         case TILE.STAIRS:   drawStairs(px,py);   break;
         case TILE.STAIRSUP: drawStairsUp(px,py); break;
         case TILE.SIGN: {
@@ -1267,7 +1613,9 @@ function drawTile(tile, px, py, tx, ty) {
             ];
             const onWall = snb.some(t=>t===TILE.WALL);
             if (dark || onWall) {
-                ctx.drawImage(_tc[dark?`fd${(tx*5+ty*17)&3}`:`wl${(tx*3+ty*11)&3}`], ipx, ipy, S1, S1);
+                const sv = (tx*3+ty*11)&3;
+                const swk = dark ? `wd${sv}` : currentMap.returnMap ? `win${sv}` : `wex${sv}`;
+                ctx.drawImage(_tc[dark?`fd${(tx*5+ty*17)&3}`:swk], ipx, ipy, S1, S1);
             } else if (snb.some(t=>t===TILE.FLOOR)) {
                 ctx.drawImage(_tc[`fl${(tx*5+ty*17)&3}`], ipx, ipy, S1, S1);
             } else if (snb.some(t=>t===TILE.PATH)) {
@@ -1279,7 +1627,7 @@ function drawTile(tile, px, py, tx, ty) {
             else        drawSignPost(px,py);
             break;
         }
-        case TILE.TORCH:    drawTorch(px,py);    break;
+        case TILE.TORCH:    drawTorch(px,py,tx,ty); break;
         default: ctx.fillStyle='#000'; ctx.fillRect(ipx,ipy,TS,TS);
     }
 }
@@ -1355,15 +1703,17 @@ function drawFloor(px, py, dark) {
 }
 
 function drawWall(px, py, dark) {
-    const mortar   = dark ? '#120e18' : '#4a3828';
+    const P = PALETTE;
+    const mortar    = dark ? P.D_VOID  : P.M_CLAY;
+    const topStrip  = dark ? P.D_BLUE  : P.M_STONE;
     const brickCols = dark
-        ? ['#1c1428','#221830','#181222']
-        : ['#6a4830','#7a5838','#5c3c24'];
+        ? [P.D_BLUE, P.M_TEAL, P.D_STONE]
+        : [P.M_CLAY, P.M_STONE, P.S_DARK];
     // Mortar base
     ctx.fillStyle = mortar;
     ctx.fillRect(Math.floor(px), Math.floor(py), TS, TS);
     // Top accent strip
-    ctx.fillStyle = dark ? '#1a1422' : '#5a4432';
+    ctx.fillStyle = topStrip;
     ctx.fillRect(Math.floor(px), Math.floor(py), TS, Math.max(1, Math.floor(TS*.06)));
     // 4 brick rows, each offset half a brick
     const bH = Math.floor(TS/4), bW = Math.floor(TS/2);
@@ -1378,11 +1728,11 @@ function drawWall(px, py, dark) {
             if (x2 <= x1 || y2 <= y1) continue;
             ctx.fillStyle = brickCols[(row+col+3) % brickCols.length];
             ctx.fillRect(x1, y1, x2-x1, y2-y1);
-            // top 1-px highlight
-            ctx.fillStyle = 'rgba(255,255,255,0.08)';
+            // top 1-px highlight (flat palette — no rgba)
+            ctx.fillStyle = P.L_WHITE;
             ctx.fillRect(x1, y1, x2-x1, 1);
             // bottom 1-px shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.20)';
+            ctx.fillStyle = P.D_VOID;
             ctx.fillRect(x1, y2-1, x2-x1, 1);
         }
     }
@@ -1418,206 +1768,229 @@ function drawTree(px, py, tx, ty) {
 }
 
 function drawWater(px, py) {
-    const t = timeMs/1000;
-    const tx = Math.round(px/TS), ty = Math.round(py/TS);
-    const ws = tx*7 + ty*13; // tile seed
-    // Dark base + lighter mid band
-    ctx.fillStyle = '#1a5a8c'; ctx.fillRect(Math.floor(px), Math.floor(py), TS, TS);
-    ctx.fillStyle = '#2472a8'; ctx.fillRect(Math.floor(px), Math.floor(py+TS*.35), TS, Math.floor(TS*.30));
-    // 3 animated wave bands
-    for (let i = 0; i < 3; i++) {
-        const wy = Math.floor(py + (TS/4)*(i+1) + Math.sin(t*1.4+px*.04+i*1.2)*2);
-        ctx.fillStyle = `rgba(80,160,210,${0.25+0.12*Math.sin(t*1.8+i)})`;
-        ctx.fillRect(Math.floor(px+TS*.05), wy, Math.floor(TS*.90), Math.max(1,Math.floor(TS*.06)));
-    }
-    // Shimmer glint
-    ctx.fillStyle = `rgba(200,235,255,${0.12+0.10*Math.sin(t*2.8+px*.08)})`;
-    ctx.fillRect(Math.floor(px+TS*.06), Math.floor(py+TS*.10), Math.floor(TS*.20), Math.floor(TS*.06));
-    // Lily pad (1 in 5 water tiles, anchored by tile seed)
+    const ipx = Math.floor(px), ipy = Math.floor(py);
+    // Blit pre-rendered flipbook frame (8fps = 125ms per frame)
+    const frame = Math.floor(timeMs / 125) & 3;
+    ctx.drawImage(_tc[`wa${frame}`], ipx, ipy, TS+1, TS+1);
+    // Live lily pad (anchored by tile-seed so same pad each frame)
+    const txw = Math.round(px/TS), tyw = Math.round(py/TS);
+    const ws = txw*7 + tyw*13;
     if (ws % 5 === 0) {
         const lpx = Math.floor(px + TS*.18 + (ws%3)*TS*.22);
         const lpy = Math.floor(py + TS*.30 + ((ws>>2)%3)*TS*.20);
         const lpR = Math.floor(TS*.13);
-        // Pad body
-        ctx.fillStyle = '#1a6810';
+        // Pad body (M_FOREST green circle)
+        ctx.fillStyle = PALETTE.M_FOREST;
         ctx.beginPath(); ctx.arc(lpx, lpy, lpR, 0, Math.PI*2); ctx.fill();
-        // Notch cut-out (wedge in water color)
-        ctx.fillStyle = '#1e6494';
+        // Notch wedge cut-out (water colour)
+        ctx.fillStyle = PALETTE.M_SLATE;
         ctx.beginPath(); ctx.moveTo(lpx,lpy); ctx.arc(lpx,lpy,lpR+1,-0.45,0.15); ctx.closePath(); ctx.fill();
-        // Highlight on pad
-        ctx.fillStyle = 'rgba(60,200,60,0.25)';
-        ctx.beginPath(); ctx.arc(lpx-Math.floor(lpR*.3), lpy-Math.floor(lpR*.3), Math.floor(lpR*.5), 0, Math.PI*2); ctx.fill();
-        // Tiny pink/white flower on some pads
+        // 2px specular highlight
+        ctx.fillStyle = PALETTE.L_LEAF;
+        ctx.fillRect(lpx-Math.floor(lpR*.3), lpy-Math.floor(lpR*.3), 2, 1);
+        // Tiny flower on rarer pads
         if (ws % 15 === 0) {
-            ctx.fillStyle = '#e8a0c0';
+            ctx.fillStyle = PALETTE.A_RARE;
             ctx.beginPath(); ctx.arc(lpx, lpy-Math.floor(lpR*.1), Math.max(1,Math.floor(lpR*.35)), 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#fff8e0';
-            ctx.beginPath(); ctx.arc(lpx, lpy-Math.floor(lpR*.1), Math.max(1,Math.floor(lpR*.16)), 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = PALETTE.L_WHITE;
+            ctx.fillRect(lpx-1, lpy-Math.floor(lpR*.1)-1, 2, 2);
         }
     }
 }
 
-function drawDoor(px, py) {
+function drawDoor(px, py, tx, ty) {
+    const P = PALETTE;
     const dark = currentMap.dark;
     const T = TS;
     const ipx = Math.floor(px), ipy = Math.floor(py);
+    const S1 = T + 1;
 
-    // ── 1. Wall background (full tile) ──────────────────
-    drawWall(ipx, ipy, dark);
+    // ── 1. Wall background from tile cache ───────────────────────────────
+    const wv = ((tx||0)*3 + (ty||0)*11) & 3;
+    const wk = dark ? `wd${wv}` : currentMap.returnMap ? `win${wv}` : `wex${wv}`;
+    ctx.drawImage(_tc[wk], ipx, ipy, S1, S1);
 
-    // ── 2. Stone door frame (recessed arch) ─────────────
-    const frameL = Math.floor(T*.13), frameR = Math.floor(T*.87);
-    const frameW  = frameR - frameL;
+    // ── 2. Stone door frame (recessed arch) ──────────────────────────────
+    const frameL   = Math.floor(T*.13), frameR = Math.floor(T*.87);
+    const frameW   = frameR - frameL;
     const frameTop = Math.floor(T*.05), frameBot = Math.floor(T*.86);
-    const frameH  = frameBot - frameTop;
-    const frameCol = dark ? '#0e0b16' : '#3a2a18';
-    ctx.fillStyle = frameCol;
-    ctx.fillRect(ipx+frameL-2, ipy+frameTop, frameW+4, frameH); // recess shadow
+    ctx.fillStyle = dark ? P.D_VOID : P.D_BROWN;
+    ctx.fillRect(ipx+frameL-2, ipy+frameTop, frameW+4, frameBot-frameTop);
 
-    // Arch top — 3 flat rect approximation
+    // Arch top
     const archH = Math.floor(T*.10);
-    ctx.fillStyle = dark ? '#16121e' : '#4a3828';
+    ctx.fillStyle = dark ? P.D_BLUE  : P.M_CLAY;
     ctx.fillRect(ipx+frameL, ipy+frameTop, frameW, archH);
-    ctx.fillStyle = dark ? '#1c1828' : '#5a4838';
+    ctx.fillStyle = dark ? P.D_STONE : P.M_STONE;
     ctx.fillRect(ipx+frameL+2, ipy+frameTop+1, frameW-4, archH-2);
 
-    // ── 3. Door panel (wood planks) ───────────────────────
-    const dL = ipx+frameL+2, dTop = ipy+frameTop+archH;
-    const dW = frameW-4,    dH  = frameBot - frameTop - archH - 2;
-    const plankH = Math.floor(dH/4);
-    const plankCols = dark
-        ? ['#2a1808','#321e0c','#241408','#2e1c0a']
-        : ['#7a4018','#8a4c20','#6a3410','#7c4820'];
-    for (let i = 0; i < 4; i++) {
-        const plankY = dTop + i*plankH;
-        const ph = i === 3 ? dH - 3*plankH : plankH;
-        ctx.fillStyle = plankCols[i];
-        ctx.fillRect(dL, plankY, dW, ph - 1);
-        // Highlight top edge
-        ctx.fillStyle = 'rgba(255,255,255,0.10)';
-        ctx.fillRect(dL, plankY, dW, 1);
-        // Vertical grain lines
-        ctx.fillStyle = 'rgba(0,0,0,0.10)';
-        ctx.fillRect(dL+Math.floor(dW*.33), plankY+1, 1, ph-2);
-        ctx.fillRect(dL+Math.floor(dW*.66), plankY+1, 1, ph-2);
+    // ── 3. Door panel ────────────────────────────────────────────────────
+    const dL   = ipx+frameL+2,  dTop = ipy+frameTop+archH;
+    const dW   = frameW-4,      dH   = frameBot-frameTop-archH-2;
+
+    // Open state: player is standing on this tile → show interior darkness
+    const isOpen = (tx !== undefined) && (player.x === tx) && (player.y === ty);
+
+    if (isOpen) {
+        // Dark void (interior darkness visible)
+        ctx.fillStyle = P.D_VOID;
+        ctx.fillRect(dL, dTop, dW, dH);
+        // Dithered transition at the threshold — D_VOID fading into D_BLUE
+        dither2(ctx, dL, dTop, dW, Math.floor(dH*.4), P.D_VOID, P.D_BLUE, 0);
+    } else {
+        // Closed state — vertical wood planks
+        const plankH   = Math.floor(dH/4);
+        const plankCols = dark
+            ? [P.D_BROWN, P.D_VOID, P.D_BROWN, P.D_VOID]
+            : [P.S_DARK,  P.M_CLAY, P.S_DARK,  P.S_MID ];
+        for (let i = 0; i < 4; i++) {
+            const plankY = dTop + i*plankH;
+            const ph = (i === 3) ? dH - 3*plankH : plankH;
+            ctx.fillStyle = plankCols[i];
+            ctx.fillRect(dL, plankY, dW, ph-1);
+            // Top highlight — flat palette pixel (no rgba)
+            ctx.fillStyle = P.L_WHITE;
+            ctx.fillRect(dL, plankY, dW, 1);
+            // Vertical grain lines
+            ctx.fillStyle = P.D_VOID;
+            ctx.fillRect(dL+Math.floor(dW*.33), plankY+1, 1, ph-2);
+            ctx.fillRect(dL+Math.floor(dW*.66), plankY+1, 1, ph-2);
+        }
+        // Panel inset shadow on sides
+        ctx.fillStyle = P.D_VOID;
+        ctx.fillRect(dL,      dTop, 2, dH);
+        ctx.fillRect(dL+dW-2, dTop, 2, dH);
+
+        // ── Metal crossbar across the middle (spec item 15) ──────────────
+        const crossY = dTop + Math.floor(dH*.46);
+        const crossH = Math.max(2, Math.floor(T*.05));
+        ctx.fillStyle = dark ? P.D_STONE : P.M_STONE;
+        ctx.fillRect(dL, crossY, dW, crossH);
+        ctx.fillStyle = P.L_STONE; ctx.fillRect(dL, crossY,          dW, 1);
+        ctx.fillStyle = P.D_VOID;  ctx.fillRect(dL, crossY+crossH-1, dW, 1);
+
+        // ── Handle (brass) ────────────────────────────────────────────────
+        const hx = ipx+Math.floor(T*.70), hy = ipy+Math.floor(T*.50);
+        ctx.fillStyle = P.U_GOLD;
+        ctx.fillRect(hx, hy, Math.floor(T*.06), Math.floor(T*.10));
+        ctx.fillStyle = P.L_GOLD;
+        ctx.fillRect(hx+1, hy+1, Math.floor(T*.03), Math.floor(T*.04));
+
+        // ── Hinges (iron, left side) ──────────────────────────────────────
+        const hingeX = ipx+frameL+2;
+        const hingeW = Math.floor(T*.07), hingeH = Math.floor(T*.06);
+        ctx.fillStyle = P.D_STONE;
+        ctx.fillRect(hingeX, ipy+Math.floor(T*.20), hingeW, hingeH);
+        ctx.fillRect(hingeX, ipy+Math.floor(T*.62), hingeW, hingeH);
+        ctx.fillStyle = P.L_WHITE;
+        ctx.fillRect(hingeX, ipy+Math.floor(T*.20), hingeW, 1);
+        ctx.fillRect(hingeX, ipy+Math.floor(T*.62), hingeW, 1);
     }
-    // Panel inset shadow on sides
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.fillRect(dL, dTop, 2, dH);
-    ctx.fillRect(dL+dW-2, dTop, 2, dH);
 
-    // ── 4. Door handle (brass) ────────────────────────────
-    const hx = ipx + Math.floor(T*.70), hy = ipy + Math.floor(T*.50);
-    ctx.fillStyle = '#c8901a';
-    ctx.fillRect(hx, hy, Math.floor(T*.06), Math.floor(T*.10));
-    ctx.fillStyle = '#e8b030';
-    ctx.fillRect(hx+1, hy+1, Math.floor(T*.03), Math.floor(T*.04));
-
-    // ── 5. Hinges (iron) ─────────────────────────────────
-    const hingeX = ipx+frameL+2, hingeW = Math.floor(T*.07), hingeH = Math.floor(T*.06);
-    ctx.fillStyle = '#282828';
-    ctx.fillRect(hingeX, ipy+Math.floor(T*.20), hingeW, hingeH);
-    ctx.fillRect(hingeX, ipy+Math.floor(T*.62), hingeW, hingeH);
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.fillRect(hingeX, ipy+Math.floor(T*.20), hingeW, 1);
-    ctx.fillRect(hingeX, ipy+Math.floor(T*.62), hingeW, 1);
-
-    // ── 6. Stone step (threshold) at bottom ──────────────
+    // ── 6. Stone step / threshold ─────────────────────────────────────────
     const stepH = Math.floor(T*.14);
-    ctx.fillStyle = dark ? '#1e1830' : '#8a7a60';
+    ctx.fillStyle = dark ? P.D_BLUE : P.M_SAND;
     ctx.fillRect(ipx+frameL-3, ipy+frameBot, frameW+6, stepH);
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.fillRect(ipx+frameL-3, ipy+frameBot, frameW+6, 1);
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.fillRect(ipx+frameL-3, ipy+frameBot+stepH-1, frameW+6, 1);
+    ctx.fillStyle = P.L_WHITE;
+    ctx.fillRect(ipx+frameL-3, ipy+frameBot,          frameW+6, 1);
+    ctx.fillStyle = P.D_VOID;
+    ctx.fillRect(ipx+frameL-3, ipy+frameBot+stepH-1,  frameW+6, 1);
 
-    // ── 7. Small transom window above door ────────────────
+    // ── 7. Transom window above arch ─────────────────────────────────────
     const winY = ipy+frameTop+2, winH = archH-4;
     const winL = dL+Math.floor(dW*.20), winW = Math.floor(dW*.60);
     if (winH > 2) {
-        ctx.fillStyle = dark ? '#0a0818' : '#4a6a8a'; // glass
+        ctx.fillStyle = dark ? P.D_VOID : P.M_SLATE;
         ctx.fillRect(winL, winY, winW, winH);
-        ctx.fillStyle = 'rgba(255,255,255,0.20)';
+        ctx.fillStyle = P.L_WHITE;
         ctx.fillRect(winL, winY, winW, 1);
-        ctx.fillRect(winL, winY, 1, winH);
-        ctx.fillStyle = dark ? '#1a1430' : '#6a8aaa';
-        ctx.fillRect(winL+Math.floor(winW/2)-1, winY, 1, winH); // center bar
+        ctx.fillRect(winL, winY, 1,    winH);
+        ctx.fillStyle = dark ? P.D_BLUE : P.L_BLUE;
+        ctx.fillRect(winL+Math.floor(winW/2)-1, winY, 1, winH);
     }
 }
 
 function drawStairs(px, py) {
-    ctx.fillStyle='#12101a'; ctx.fillRect(px,py,TS,TS);
-    for (let i=0;i<5;i++) {
-        const sy=py+i*(TS/5), inset=i*(TS/11);
-        ctx.fillStyle=`hsl(240,8%,${28+i*9}%)`; ctx.fillRect(px+inset,sy,TS-inset*2,TS/5-1);
-        ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.fillRect(px+inset,sy,TS-inset*2,2);
-        ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fillRect(px+inset,sy+TS/5-3,TS-inset*2,2);
+    const P = PALETTE, ipx = Math.floor(px), ipy = Math.floor(py);
+    const stripeH = Math.floor(TS/5);
+    // 5 stripes alternating dark/mid slate — descending depth effect
+    const cols = [P.M_SLATE, P.D_BLUE, P.M_SLATE, P.D_BLUE, P.M_TEAL];
+    for (let i = 0; i < 5; i++) {
+        const sy  = ipy + i*stripeH;
+        const inset = i * Math.floor(TS/11);
+        const h   = i===4 ? TS - 4*stripeH : stripeH;
+        ctx.fillStyle = cols[i]; ctx.fillRect(ipx+inset, sy, TS-inset*2, h-1);
+        ctx.fillStyle = P.L_BLUE;  ctx.fillRect(ipx+inset, sy, TS-inset*2, 1);          // bright step edge
+        ctx.fillStyle = P.D_VOID;  ctx.fillRect(ipx+inset, sy+h-2, TS-inset*2, 1);      // dark riser shadow
     }
-    const t=timeMs/1000, a=0.28+0.12*Math.sin(t*2.2);
-    const gr2=ctx.createRadialGradient(px+TS/2,py+TS,0,px+TS/2,py+TS,TS*.85);
-    gr2.addColorStop(0,`rgba(100,70,220,${a})`); gr2.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=gr2; ctx.fillRect(px,py,TS,TS);
-    ctx.fillStyle=`rgba(180,150,255,${0.65+0.18*Math.sin(t*3)})`;
-    ctx.font=`bold ${TS*.3}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('↓',px+TS/2,py+TS*.46+Math.sin(t*2.5)*2);
+    // Animated descend arrow (palette colour, no rgba)
+    const t = timeMs/1000;
+    ctx.fillStyle = P.A_PURPLE;
+    ctx.font = `bold ${Math.floor(TS*.3)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('↓', ipx+Math.floor(TS/2), Math.floor(ipy+TS*.44+Math.sin(t*2.5)*2));
 }
 
 function drawStairsUp(px, py) {
+    const P = PALETTE, ipx = Math.floor(px), ipy = Math.floor(py);
     if (currentMap?.returnMap) {
-        // Interior exit — draw as a floor doormat with EXIT label
-        drawFloor(px, py, false);
-        ctx.fillStyle = '#6a3a10';
+        // Interior exit — floor doormat with EXIT label
+        const fv = ((ipx/TS|0)*5+(ipy/TS|0)*17)&3;
+        ctx.drawImage(_tc[`fl${fv}`], ipx, ipy, TS+1, TS+1);
+        ctx.fillStyle = P.S_DARK;
         ctx.fillRect(Math.floor(px+TS*.10), Math.floor(py+TS*.25), Math.floor(TS*.80), Math.floor(TS*.50));
-        ctx.fillStyle = '#8a5020';
-        for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = P.S_MID;
+        for (let i = 0; i < 4; i++)
             ctx.fillRect(Math.floor(px+TS*.15+i*TS*.18), Math.floor(py+TS*.30), Math.max(1,Math.floor(TS*.04)), Math.floor(TS*.40));
-        }
-        ctx.fillStyle = '#c8a050';
+        ctx.fillStyle = P.L_GOLD;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.font = `bold ${Math.floor(TS*.22)}px sans-serif`;
         ctx.fillText('EXIT', Math.floor(px+TS/2), Math.floor(py+TS*.52));
         return;
     }
-    ctx.fillStyle='#0e1812'; ctx.fillRect(px,py,TS,TS);
-    for (let i=4;i>=0;i--) {
-        const sy=py+i*(TS/5), inset=(4-i)*(TS/11);
-        ctx.fillStyle=`hsl(140,10%,${16+(5-i)*7}%)`; ctx.fillRect(px+inset,sy,TS-inset*2,TS/5-1);
-        ctx.fillStyle='rgba(255,255,255,0.09)'; ctx.fillRect(px+inset,sy,TS-inset*2,2);
-        ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(px+inset,sy+TS/5-3,TS-inset*2,2);
+    // 5 stripes alternating moss/dark green — ascending depth
+    const stripeH = Math.floor(TS/5);
+    const cols = [P.M_MOSS, P.D_GREEN, P.M_FOREST, P.D_GREEN, P.M_MOSS];
+    for (let i = 4; i >= 0; i--) {
+        const sy    = ipy + (4-i)*stripeH;
+        const inset = i * Math.floor(TS/11);
+        const h     = i===0 ? TS - 4*stripeH : stripeH;
+        ctx.fillStyle = cols[4-i]; ctx.fillRect(ipx+inset, sy, TS-inset*2, h-1);
+        ctx.fillStyle = P.L_LEAF;  ctx.fillRect(ipx+inset, sy, TS-inset*2, 1);
+        ctx.fillStyle = P.D_GREEN; ctx.fillRect(ipx+inset, sy+h-2, TS-inset*2, 1);
     }
-    const t=timeMs/1000, a=0.28+0.12*Math.sin(t*2.2);
-    const gr2=ctx.createRadialGradient(px+TS/2,py,0,px+TS/2,py,TS*.85);
-    gr2.addColorStop(0,`rgba(50,190,70,${a})`); gr2.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=gr2; ctx.fillRect(px,py,TS,TS);
-    ctx.fillStyle=`rgba(100,230,130,${0.65+0.18*Math.sin(t*3)})`;
-    ctx.font=`bold ${TS*.3}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('↑',px+TS/2,py+TS*.54+Math.sin(t*2.5)*2);
+    const t = timeMs/1000;
+    ctx.fillStyle = P.L_LEAF;
+    ctx.font = `bold ${Math.floor(TS*.3)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('↑', ipx+Math.floor(TS/2), Math.floor(ipy+TS*.54+Math.sin(t*2.5)*2));
 }
 
 function drawWallPlaque(px, py) {
+    const P = PALETTE;
     const U = Math.max(1, Math.floor(TS/16));
     // Stone bracket mounts (left + right)
-    ctx.fillStyle = '#3a2c1c';
+    ctx.fillStyle = P.D_BROWN;
     ctx.fillRect(Math.floor(px+TS*.10), Math.floor(py+TS*.30), U*2, U*3);
     ctx.fillRect(Math.floor(px+TS*.82), Math.floor(py+TS*.30), U*2, U*3);
     // Plaque board: dark border
     const bx = Math.floor(px+TS*.12), by = Math.floor(py+TS*.22);
     const bw = Math.floor(TS*.76),    bh = Math.floor(TS*.44);
-    ctx.fillStyle = '#2a1a08'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = P.D_BROWN; ctx.fillRect(bx, by, bw, bh);
     // Mid fill
-    ctx.fillStyle = '#a06828'; ctx.fillRect(bx+2, by+2, bw-4, bh-4);
+    ctx.fillStyle = P.M_CLAY;  ctx.fillRect(bx+2, by+2, bw-4, bh-4);
     // Top half highlight
-    ctx.fillStyle = '#c08038'; ctx.fillRect(bx+2, by+2, bw-4, Math.floor((bh-4)/2));
-    // 3 carved text lines
+    ctx.fillStyle = P.M_SAND;  ctx.fillRect(bx+2, by+2, bw-4, Math.floor((bh-4)/2));
+    // 3 carved text lines (flat dark — no rgba)
     const lm = bx+Math.floor(bw*.14), lw = Math.floor(bw*.72);
-    ctx.fillStyle = 'rgba(40,15,5,0.72)';
+    ctx.fillStyle = P.D_BROWN;
     ctx.fillRect(lm, Math.floor(by+bh*.24), lw,                 2);
     ctx.fillRect(lm, Math.floor(by+bh*.50), lw,                 2);
     ctx.fillRect(lm, Math.floor(by+bh*.72), Math.floor(lw*.55), 2);
     // Bottom shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.20)'; ctx.fillRect(bx+2, by+bh-4, bw-4, 2);
+    ctx.fillStyle = P.D_VOID; ctx.fillRect(bx+2, by+bh-4, bw-4, 2);
     // Corner nail dots
-    ctx.fillStyle = '#1a1008';
+    ctx.fillStyle = P.D_VOID;
     [[bx+Math.floor(bw*.10), by+Math.floor(bh*.15)],
      [bx+Math.floor(bw*.90), by+Math.floor(bh*.15)],
      [bx+Math.floor(bw*.10), by+Math.floor(bh*.82)],
@@ -1627,37 +2000,38 @@ function drawWallPlaque(px, py) {
 }
 
 function drawSignPost(px, py) {
+    const P = PALETTE;
     const U = Math.max(1, Math.floor(TS/16));
     // ── Post (3-color flat strips) ──────────────────────
     const postX = Math.floor(px+TS*.44), postY = Math.floor(py+TS*.32);
     const postW = Math.floor(TS*.12), postH = Math.floor(TS*.68);
-    ctx.fillStyle = '#4a2808'; ctx.fillRect(postX, postY, postW, postH);
-    ctx.fillStyle = '#6e3e14'; ctx.fillRect(postX+Math.floor(postW*.25), postY, Math.floor(postW*.35), postH);
-    ctx.fillStyle = '#3a1e08'; ctx.fillRect(postX+Math.floor(postW*.75), postY, Math.floor(postW*.25), postH);
+    ctx.fillStyle = P.D_BROWN; ctx.fillRect(postX, postY, postW, postH);
+    ctx.fillStyle = P.M_CLAY;  ctx.fillRect(postX+Math.floor(postW*.25), postY, Math.floor(postW*.35), postH);
+    ctx.fillStyle = P.D_VOID;  ctx.fillRect(postX+Math.floor(postW*.75), postY, Math.floor(postW*.25), postH);
 
     // ── Board ──────────────────────────────────────────
     const bx = Math.floor(px+TS*.08), by = Math.floor(py+TS*.04);
     const bw = Math.floor(TS*.84),    bh = Math.floor(TS*.30);
     // Dark border fill
-    ctx.fillStyle = '#4a2808'; ctx.fillRect(bx, by, bw, bh);
-    // Mid color
-    ctx.fillStyle = '#8a5018'; ctx.fillRect(bx+1, by+1, bw-2, bh-2);
-    // Lighter top half
-    ctx.fillStyle = '#b07028'; ctx.fillRect(bx+1, by+1, bw-2, Math.floor(bh/2)-1);
+    ctx.fillStyle = P.D_BROWN; ctx.fillRect(bx, by, bw, bh);
+    // Parchment fill (spec: parchment-colored fill, 2px dark border)
+    ctx.fillStyle = P.S_DARK;  ctx.fillRect(bx+1, by+1, bw-2, bh-2);
+    ctx.fillStyle = P.L_PARCH; ctx.fillRect(bx+1, by+1, bw-2, Math.floor(bh/2)-1);
 
-    // Carved text lines
+    // 2 horizontal 1px lines inside (spec item 17 — suggests text)
     const lm = bx + Math.floor(bw*.14), lw = Math.floor(bw*.72);
-    ctx.fillStyle = 'rgba(50,20,5,0.70)';
+    ctx.fillStyle = P.D_BROWN;
     ctx.fillRect(lm, Math.floor(by+bh*.22), lw,                 2);
     ctx.fillRect(lm, Math.floor(by+bh*.46), lw,                 2);
     ctx.fillRect(lm, Math.floor(by+bh*.68), Math.floor(lw*.55), 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    // Highlight row below each line (flat palette — no rgba)
+    ctx.fillStyle = P.L_PARCH;
     ctx.fillRect(lm, Math.floor(by+bh*.22)+2, lw,                 1);
     ctx.fillRect(lm, Math.floor(by+bh*.46)+2, lw,                 1);
     ctx.fillRect(lm, Math.floor(by+bh*.68)+2, Math.floor(lw*.55), 1);
 
     // 4 corner nail dots (flat rects)
-    ctx.fillStyle = '#2a1a08';
+    ctx.fillStyle = P.D_VOID;
     [[bx+Math.floor(bw*.12), by+Math.floor(bh*.18)],
      [bx+Math.floor(bw*.88), by+Math.floor(bh*.18)],
      [bx+Math.floor(bw*.12), by+Math.floor(bh*.80)],
@@ -1666,22 +2040,23 @@ function drawSignPost(px, py) {
     });
 }
 
-function drawTorch(px, py) {
-    drawWall(px,py,currentMap.dark);
-    const t=timeMs/1000, fl=0.88+0.12*Math.sin(t*11+px*.28);
-    ctx.fillStyle='#282828';
-    ctx.fillRect(px+TS*.42,py+TS*.34,TS*.16,TS*.36);
-    ctx.fillStyle='#363636'; ctx.fillRect(px+TS*.38,py+TS*.34,TS*.24,TS*.05);
-    ctx.fillRect(px+TS*.38,py+TS*.66,TS*.24,TS*.05);
-    const tcx=px+TS*.5, tcy=py+TS*.26;
-    ctx.fillStyle=`rgba(220,55,0,${(0.7+0.3*Math.sin(t*8+px*.2))*.85})`;
-    ctx.beginPath(); ctx.ellipse(tcx,tcy+TS*.05,TS*.14*fl,TS*.20,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='rgba(255,118,0,0.9)';
-    ctx.beginPath(); ctx.ellipse(tcx,tcy,TS*.09*fl,TS*.16,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='rgba(255,238,100,0.95)';
-    ctx.beginPath(); ctx.ellipse(tcx,tcy+TS*.03,TS*.05*fl,TS*.10,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='rgba(255,255,230,0.85)';
-    ctx.beginPath(); ctx.arc(tcx,tcy+TS*.04,TS*.024*fl,0,Math.PI*2); ctx.fill();
+function drawTorch(px, py, tx, ty) {
+    const dark = currentMap.dark;
+    const ipx = Math.floor(px), ipy = Math.floor(py);
+    const S1 = TS + 1;
+    // ── 1. Wall background from tile cache (no raw drawWall call) ──────────
+    const wv = ((tx||0)*3 + (ty||0)*11) & 3;
+    const wk = dark ? `wd${wv}` : currentMap.returnMap ? `win${wv}` : `wex${wv}`;
+    ctx.drawImage(_tc[wk], ipx, ipy, S1, S1);
+    // ── 2. Irregular flame — per-tile phase so torches flicker independently ─
+    // Three summed sine waves at incommensurable frequencies create a
+    // convincingly non-periodic flicker without any random() call.
+    const phase = (((tx||0) * 7 + (ty||0) * 13) & 63) * 0.097;
+    const noise = Math.sin(timeMs * 0.008 + phase)
+                + Math.sin(timeMs * 0.021 + phase * 1.63) * 0.5
+                + Math.sin(timeMs * 0.053 + phase * 0.79) * 0.3;
+    const frame = noise > 0.1 ? 'ta' : 'tb';
+    ctx.drawImage(_tc[frame], ipx, ipy, S1, S1);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1697,8 +2072,8 @@ function spawnParticle(type, x, y) {
     const p = { type, x, y, life:0 };
     if (type==='firefly') Object.assign(p,{vx:(r()-.5)*.28,vy:(r()-.5)*.28,maxLife:5000+r()*5000,size:1.5+r()*1.5,phase:r()*Math.PI*2});
     else if (type==='dust')  Object.assign(p,{vx:(r()-.5)*.07,vy:-.03-r()*.04,maxLife:3000+r()*2000,size:1+r()*.8});
-    else if (type==='spark') Object.assign(p,{vx:(r()-.5)*2.2,vy:-1.4-r()*2,maxLife:350+r()*500,size:1.5+r(),color:r()<.5?'#ff8020':'#ffcc00'});
-    else if (type==='leaf')  Object.assign(p,{vx:.15+r()*.35,vy:.08+r()*.18,maxLife:6000+r()*4000,size:2+r(),color:r()<.5?'#8a5820':'#a86820',angle:r()*Math.PI*2,spin:(r()-.5)*.05});
+    else if (type==='spark') Object.assign(p,{vx:(r()-.5)*2.2,vy:-1.4-r()*2,maxLife:350+r()*500,size:1.5+r(),color:r()<.5?PALETTE.A_ORANGE:PALETTE.A_YELLOW});
+    else if (type==='leaf')  Object.assign(p,{vx:.15+r()*.35,vy:.08+r()*.18,maxLife:6000+r()*4000,size:2+r(),color:r()<.5?PALETTE.S_DARK:PALETTE.M_CLAY,angle:r()*Math.PI*2,spin:(r()-.5)*.05});
     PARTICLES.push(p);
 }
 
@@ -1761,7 +2136,7 @@ function renderParticles() {
     for (const p of PARTICLES) {
         const pct = p.life/p.maxLife;
         const sx  = p.x-cam.x, sy = p.y-cam.y;
-        if (sx<-30||sx>canvas.width+30||sy<-30||sy>canvas.height+30) continue;
+        if (sx<-30||sx>cW+30||sy<-30||sy>cH+30) continue;
         if (p.type==='firefly') {
             const alpha = Math.sin(pct*Math.PI)*(.5+.4*Math.sin(p.life*.008+p.phase));
             ctx.globalAlpha  = alpha;
@@ -1795,20 +2170,20 @@ function renderVignette() {
     // Soft corner darkening for interiors — makes small rooms feel enclosed
     if (!currentMap?.returnMap) return;
     const grd = ctx.createRadialGradient(
-        canvas.width/2, canvas.height/2, Math.min(canvas.width,canvas.height)*.32,
-        canvas.width/2, canvas.height/2, Math.min(canvas.width,canvas.height)*.75
+        cW/2, cH/2, Math.min(cW,cH)*.32,
+        cW/2, cH/2, Math.min(cW,cH)*.75
     );
     grd.addColorStop(0,'rgba(0,0,0,0)');
     grd.addColorStop(1,'rgba(0,0,0,0.48)');
     ctx.fillStyle = grd;
-    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillRect(0,0,cW,cH);
 }
 
 // ═══════════════════════════════════════════════════════
 //  ENTITY & ITEM RENDERING
 // ═══════════════════════════════════════════════════════
-const CLASS_COLORS = {Warrior:'#c8922a',Rogue:'#9a40d0',Wizard:'#3a8ad0',Cleric:'#d0c840'};
-const CLASS_CLOAK  = {Warrior:'#6a2808',Rogue:'#2a0e3a',Wizard:'#101e3a',Cleric:'#5a4808'};
+const CLASS_COLORS = {Warrior:PALETTE.CLASS_WARRIOR,Rogue:PALETTE.CLASS_ROGUE,Wizard:PALETTE.CLASS_WIZARD,Cleric:PALETTE.CLASS_CLERIC};
+const CLASS_CLOAK  = {Warrior:PALETTE.CLOAK_WARRIOR,Rogue:PALETTE.CLOAK_ROGUE,Wizard:PALETTE.CLOAK_WIZARD,Cleric:PALETTE.CLOAK_CLERIC};
 
 function drawCharacter(sx, sy, color, facing, name, isPlayer, isNear, ghost, walkPhase=0, isMoving=false) {
     const cx=sx+TS/2, cy=sy+TS/2, r=TS*.28, t=timeMs/1000;
@@ -1979,9 +2354,9 @@ function drawItem(item, sx, sy) {
 let lightCanvas = null, lightCtx2 = null;
 
 function ensureLightCanvas() {
-    if (!lightCanvas||lightCanvas.width!==canvas.width||lightCanvas.height!==canvas.height) {
+    if (!lightCanvas||lightCanvas.width!==cW||lightCanvas.height!==cH) {
         lightCanvas=document.createElement('canvas');
-        lightCanvas.width=canvas.width; lightCanvas.height=canvas.height;
+        lightCanvas.width=cW; lightCanvas.height=cH;
         lightCtx2=lightCanvas.getContext('2d');
     }
 }
@@ -1989,7 +2364,7 @@ function ensureLightCanvas() {
 function renderLighting() {
     if (!currentMap.dark) return;
     ensureLightCanvas();
-    const lc=lightCtx2, t=timeMs/1000, W=lightCanvas.width, H=lightCanvas.height;
+    const lc=lightCtx2, t=timeMs/1000, W=cW, H=cH;
     lc.clearRect(0,0,W,H);
     lc.fillStyle='rgba(2,1,4,0.95)'; lc.fillRect(0,0,W,H);
     lc.globalCompositeOperation='destination-out';
@@ -2372,7 +2747,7 @@ function endBattle(outcome) {
 // ── Battle Rendering ────────────────────────────────────
 function renderBattle() {
     if (!battle.active) return;
-    const W = canvas.width, H = canvas.height, t = timeMs / 1000;
+    const W = cW, H = cH, t = timeMs / 1000;
     const en = battle.enemy;
 
     // Player shake offset (on hit)
@@ -2552,9 +2927,9 @@ function drawBattleCard(x, y, w, h, name, lvlText, hp, maxHp, showXp) {
 
     // HP bar
     const barY = y + h * 0.55, barX = x + pad, barW = w - pad * 2;
-    ctx.fillStyle = '#1a0a08'; ctx.fillRect(barX, barY, barW, bh);
+    ctx.fillStyle = PALETTE.HP_BG; ctx.fillRect(barX, barY, barW, bh);
     const pct = Math.max(0, hp / maxHp);
-    const barCol = pct > 0.5 ? '#40c840' : pct > 0.25 ? '#c8a800' : '#c82020';
+    const barCol = pct > 0.5 ? PALETTE.HP_FULL : pct > 0.25 ? PALETTE.HP_MID : PALETTE.HP_LOW;
     ctx.fillStyle = barCol; ctx.fillRect(barX, barY, barW * pct, bh);
     ctx.strokeStyle = '#3a1a10'; ctx.lineWidth = 1; ctx.strokeRect(barX, barY, barW, bh);
 
@@ -2565,7 +2940,7 @@ function drawBattleCard(x, y, w, h, name, lvlText, hp, maxHp, showXp) {
     if (showXp) {
         const xpBarY = barY + bh + 14;
         ctx.fillStyle = '#0a0a10'; ctx.fillRect(barX, xpBarY, barW, 5);
-        ctx.fillStyle = '#4060c0'; ctx.fillRect(barX, xpBarY, barW * xpProgressPct(), 5);
+        ctx.fillStyle = PALETTE.XP_FILL; ctx.fillRect(barX, xpBarY, barW * xpProgressPct(), 5);
         ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 1; ctx.strokeRect(barX, xpBarY, barW, 5);
         ctx.font = `${Math.floor(h * 0.17)}px sans-serif`;
         ctx.textAlign = 'right'; ctx.fillStyle = '#4060a0';
@@ -2849,38 +3224,41 @@ function updateHPUI() {
 //  RENDER
 // ═══════════════════════════════════════════════════════
 function render() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    if (currentMap.dark) { ctx.fillStyle='#080408'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+    // Pixel-perfect — smoothing must always be off on the main context
+    ctx.imageSmoothingEnabled = false;
 
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    const stx=Math.max(0,Math.floor(cam.x/TS)), sty=Math.max(0,Math.floor(cam.y/TS));
-    const etx=Math.min(currentMap.w-1,Math.ceil((cam.x+canvas.width)/TS));
-    const ety=Math.min(currentMap.h-1,Math.ceil((cam.y+canvas.height)/TS));
-    for (let ty=sty;ty<=ety;ty++)
-        for (let tx=stx;tx<=etx;tx++)
-            drawTile(currentMap.tiles[ty][tx],tx*TS-cam.x,ty*TS-cam.y,tx,ty);
+    ctx.clearRect(0, 0, cW, cH);
 
+    // ── Static tile layer (bgCanvas cache) ────────────────
+    // Invalidate whenever the camera has moved since the last bake
+    if (!bgDirty && (cam.x !== _bgCamX || cam.y !== _bgCamY)) bgDirty = true;
+    if (bgDirty) rebuildBgCanvas();
+    ctx.drawImage(bgCanvas, 0, 0);
+
+    // ── Animated tile layer (water, stairs, torches) ──────
+    drawAnimatedTiles();
+
+    // ── Entities ──────────────────────────────────────────
     for (const item of currentMap.items) {
         if (!itemVisible(item)) continue;
         const sx=item.x*TS-cam.x, sy=item.y*TS-cam.y;
-        if (sx>-TS&&sx<canvas.width+TS&&sy>-TS&&sy<canvas.height+TS) drawItem(item,sx,sy);
+        if (sx>-TS&&sx<cW+TS&&sy>-TS&&sy<cH+TS) drawItem(item,sx,sy);
     }
     for (const npc of currentMap.npcs) {
         const sx=npc.x*TS-cam.x, sy=npc.y*TS-cam.y;
-        if (sx>-TS*2&&sx<canvas.width+TS&&sy>-TS*2&&sy<canvas.height+TS)
+        if (sx>-TS*2&&sx<cW+TS&&sy>-TS*2&&sy<cH+TS)
             drawCharacter(sx,sy,npc.color,'down',npc.name,false,isAdjacent(npc.x,npc.y),npc.ghost);
     }
-    // Draw overworld enemies
     if (currentMap.enemies) {
         for (const en of currentMap.enemies) {
             if (!en.alive) continue;
             const sx=en.x*TS-cam.x, sy=en.y*TS-cam.y;
-            if (sx>-TS*2&&sx<canvas.width+TS*2&&sy>-TS*2&&sy<canvas.height+TS*2)
+            if (sx>-TS*2&&sx<cW+TS*2&&sy>-TS*2&&sy<cH+TS*2)
                 drawEnemyOverworld(sx, sy, en);
         }
     }
-    drawCharacter(player.renderX-cam.x, player.renderY-cam.y,
+    // Integer-pixel player position eliminates sub-pixel shimmer
+    drawCharacter(Math.round(player.renderX-cam.x), Math.round(player.renderY-cam.y),
         CLASS_COLORS[gs.charClass]||CLASS_COLORS.Warrior,
         player.facing,'',true,false,false,player.walkPhase,player.isMoving);
 
@@ -3353,12 +3731,32 @@ document.getElementById('pause-mainmenu').addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════
 //  GAME LOOP
 // ═══════════════════════════════════════════════════════
-let lastTs=0;
-function loop(ts){
-    const dt=Math.min(ts-lastTs,100);lastTs=ts;timeMs=ts;
-    updateMovement(dt);updatePlayerAnim(dt);updateCamera();
-    updateEnemies(dt);updateBattle(dt);
-    updateParticles(dt);render();
+// Fixed-timestep game loop — physics/logic always runs at 60 Hz regardless of
+// monitor refresh rate.  Raw delta is capped at 50 ms to prevent the
+// spiral-of-death when the tab is backgrounded or the frame takes too long.
+const FIXED_STEP = 1000 / 60; // ~16.667 ms
+let lastTs = 0, accumulator = 0;
+
+function loop(ts) {
+    const rawDt = ts - lastTs;
+    lastTs = ts;
+    timeMs = ts;
+
+    // Cap so a very long frame doesn't simulate many steps at once
+    accumulator += Math.min(rawDt, 50);
+
+    while (accumulator >= FIXED_STEP) {
+        const dt = FIXED_STEP;
+        updateMovement(dt);
+        updatePlayerAnim(dt);
+        updateCamera();
+        updateEnemies(dt);
+        updateBattle(dt);
+        updateParticles(dt);
+        accumulator -= FIXED_STEP;
+    }
+
+    render();
     requestAnimationFrame(loop);
 }
 

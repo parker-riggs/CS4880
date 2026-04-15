@@ -399,9 +399,22 @@
 const mc  = document.getElementById('menu-canvas');
 const mct = mc.getContext('2d');
 
+// Logical (CSS-pixel) menu canvas dimensions
+let mcW = 0, mcH = 0;
+
 function resizeMenuCanvas() {
-    mc.width  = window.innerWidth;
-    mc.height = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    mcW = window.innerWidth;
+    mcH = window.innerHeight;
+    // Physical pixel resolution
+    mc.width  = Math.round(mcW * dpr);
+    mc.height = Math.round(mcH * dpr);
+    // Keep CSS display size unchanged
+    mc.style.width  = mcW + 'px';
+    mc.style.height = mcH + 'px';
+    // Scale draw calls so we always work in logical coords
+    mct.setTransform(dpr, 0, 0, dpr, 0, 0);
+    mct.imageSmoothingEnabled = false;
 }
 resizeMenuCanvas();
 window.addEventListener('resize', resizeMenuCanvas);
@@ -411,8 +424,8 @@ const embers = Array.from({ length: EMBER_COUNT }, () => spawnEmber(true));
 
 function spawnEmber(randomY) {
     return {
-        x:    Math.random() * window.innerWidth,
-        y:    randomY ? Math.random() * window.innerHeight : window.innerHeight + 10,
+        x:    Math.random() * mcW,
+        y:    randomY ? Math.random() * mcH : mcH + 10,
         vx:   (Math.random() - 0.5) * 0.4,
         vy:   -(Math.random() * 0.6 + 0.25),
         r:    Math.random() * 2.2 + 0.6,
@@ -424,14 +437,14 @@ function spawnEmber(randomY) {
 }
 
 function menuLoop() {
-    mct.clearRect(0, 0, mc.width, mc.height);
+    mct.clearRect(0, 0, mcW, mcH);
 
     // Atmospheric fog blobs
     const t = Date.now() / 1000;
     const blobs = [
-        { x: mc.width*0.2, y: mc.height*0.6, r: mc.width*0.35, c:'rgba(60,15,15,' },
-        { x: mc.width*0.8, y: mc.height*0.3, r: mc.width*0.3,  c:'rgba(15,15,55,' },
-        { x: mc.width*0.5, y: mc.height*0.8, r: mc.width*0.25, c:'rgba(40,10,10,' },
+        { x: mcW*0.2, y: mcH*0.6, r: mcW*0.35, c:'rgba(60,15,15,' },
+        { x: mcW*0.8, y: mcH*0.3, r: mcW*0.3,  c:'rgba(15,15,55,' },
+        { x: mcW*0.5, y: mcH*0.8, r: mcW*0.25, c:'rgba(40,10,10,' },
     ];
     for (const b of blobs) {
         const a = 0.06 + 0.02 * Math.sin(t * 0.3 + b.x);
