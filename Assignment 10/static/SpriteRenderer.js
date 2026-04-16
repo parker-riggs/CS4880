@@ -164,9 +164,9 @@ class SpriteRenderer {
      * @param {number} dt  Frame delta in milliseconds.
      */
     advanceAnimations(dt) {
-        // Water — fixed 8 fps (125 ms / frame)
+        // Water — fixed 4 fps (250 ms / frame); 8fps was too visually noisy
         this._waterAccum += dt;
-        const waterInterval = 125;
+        const waterInterval = 250;
         while (this._waterAccum >= waterInterval) {
             this._waterAccum -= waterInterval;
             const frameCount = TILE_MANIFEST.WATER?.frames?.length ?? 4;

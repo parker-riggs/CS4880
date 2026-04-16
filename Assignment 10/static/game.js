@@ -12,8 +12,10 @@ const WALKABLE = new Set([
     TILE.GRASS, TILE.PATH, TILE.FLOOR,
     TILE.DOOR, TILE.STAIRS, TILE.STAIRSUP,
 ]);
-// Tiles that animate every frame and must bypass the bg cache
-const ANIMATED_TILES = new Set([TILE.WATER, TILE.STAIRS, TILE.STAIRSUP, TILE.TORCH]);
+// Tiles that animate every frame and must bypass the bg cache.
+// Only truly animated tiles belong here — static special tiles (STAIRS, STAIRSUP)
+// are baked into the bg canvas and handled by spriteRenderer.drawTile normally.
+const ANIMATED_TILES = new Set([TILE.WATER, TILE.TORCH]);
 
 // ═══════════════════════════════════════════════════════
 //  COLOUR PALETTE  — locked 32-colour pixel-art palette
@@ -1828,8 +1830,8 @@ function drawTree(px, py, tx, ty) {
 
 function drawWater(px, py) {
     const ipx = Math.floor(px), ipy = Math.floor(py);
-    // Blit pre-rendered flipbook frame (~12fps = 83ms per frame, 8-frame cycle)
-    const frame = Math.floor(timeMs / 83) & 7;
+    // Blit pre-rendered flipbook frame (4fps = 250ms per frame, 8-frame cycle)
+    const frame = Math.floor(timeMs / 250) & 7;
     ctx.drawImage(_tc[`wa${frame}`], ipx, ipy, TS+1, TS+1);
     // Live lily pad (anchored by tile-seed so same pad each frame)
     const txw = Math.round(px/TS), tyw = Math.round(py/TS);
