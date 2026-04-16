@@ -1,570 +1,383 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sprite Atlas Debugger — The Forgotten Realm</title>
-  <style>
-    :root {
-      --bg:      #0d0d1a;
-      --surface: #151528;
-      --surface2:#1e1e38;
-      --surface3:#252548;
-      --accent:  #f0c060;
-      --accent2: #80d0ff;
-      --text:    #c8c8e0;
-      --muted:   #5858a0;
-      --red:     #ff3344;
-      --green:   #50d080;
-      --border:  #2a2a50;
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<title>Sprite Atlas Debugger — The Forgotten Realm</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d14;
+    color: #e0d8c8;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+  }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 12px;
-      min-height: 100vh;
-    }
+  #header {
+    position: sticky; top: 0; z-index: 100;
+    background: #12121e; border-bottom: 2px solid #c89020;
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  #header h1 { color: #c89020; font-size: 14px; white-space: nowrap; }
+  #stats { color: #888; font-size: 11px; }
+  #stats span { color: #e0d8c8; }
+  #filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #search {
+    background: #1e1e2e; border: 1px solid #444; color: #e0d8c8;
+    padding: 4px 8px; font-family: inherit; font-size: 11px; width: 200px;
+  }
+  .cat-btn {
+    padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: inherit;
+    background: #1e1e2e; border: 1px solid #555; color: #aaa;
+  }
+  .cat-btn.active { background: #c89020; border-color: #c89020; color: #000; font-weight: bold; }
+  #progress-bar { width: 100%; height: 3px; background: #1e1e2e; position: sticky; top: 52px; z-index: 99; }
+  #progress-fill { height: 100%; background: #c89020; width: 0%; transition: width 0.15s; }
 
-    /* ── Header ───────────────────────────────────────────────── */
-    #header {
-      position: sticky;
-      top: 0;
-      z-index: 200;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 12px 16px 8px;
-      user-select: none;
-    }
+  #main { padding: 12px 16px; }
+  .cat-section { margin-bottom: 32px; }
+  .cat-title {
+    font-size: 13px; color: #c89020; letter-spacing: 2px; text-transform: uppercase;
+    border-bottom: 1px solid #333; padding-bottom: 4px; margin-bottom: 10px;
+  }
+  .cat-title span { color: #555; font-size: 11px; }
+  .sprite-grid { display: flex; flex-wrap: wrap; gap: 6px; }
 
-    #title {
-      font-size: 15px;
-      color: var(--accent);
-      letter-spacing: 3px;
-      margin-bottom: 10px;
-    }
+  .sprite-card {
+    background: #1a1a2a; border: 1px solid #333; border-radius: 2px;
+    padding: 4px; width: 80px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .sprite-card.error { border-color: #e82020 !important; background: #2a1018; }
+  .sprite-card:hover { border-color: #888; }
 
-    #controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 10px;
-    }
+  .canvas-wrap {
+    width: 48px; height: 48px; background: #111;
+    border: 1px solid #222;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .canvas-wrap canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+  .err-flag {
+    position: absolute; inset: 0; border: 2px solid #e82020;
+    background: rgba(232,32,32,0.12);
+    display: none; align-items: center; justify-content: center;
+    font-size: 20px; color: #e82020;
+  }
+  .sprite-card.error .err-flag { display: flex; }
 
-    #search {
-      background: var(--bg);
-      border: 1px solid var(--muted);
-      color: var(--text);
-      padding: 5px 10px;
-      font-family: inherit;
-      font-size: 12px;
-      width: 280px;
-    }
-    #search::placeholder { color: var(--muted); }
-    #search:focus { outline: none; border-color: var(--accent); }
+  .sprite-label {
+    font-size: 9px; color: #777; text-align: center;
+    max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sprite-card:hover .sprite-label { color: #e0d8c8; }
+  .sprite-meta { font-size: 8px; color: #555; text-align: center; }
+  .sprite-card.error .sprite-meta { color: #e82020; }
 
-    .control-group { display: flex; align-items: center; gap: 8px; }
-    .control-label { color: var(--muted); }
-    input[type=range] { accent-color: var(--accent); width: 80px; cursor: pointer; }
-    #scale-val { color: var(--accent); min-width: 28px; }
+  #tooltip {
+    position: fixed; bottom: 12px; right: 12px;
+    background: #12121e; border: 1px solid #c89020;
+    padding: 10px 12px; font-size: 11px; max-width: 340px;
+    line-height: 1.7; z-index: 999; display: none; pointer-events: none;
+  }
+  #tooltip .tt-id { color: #c89020; font-weight: bold; }
+  #tooltip .tt-file { color: #666; word-break: break-all; }
+  #tooltip .tt-err { color: #e82020; margin-top: 4px; }
 
-    label.toggle {
-      display: flex; align-items: center; gap: 6px;
-      color: var(--muted); cursor: pointer;
-    }
-    label.toggle input { accent-color: var(--green); cursor: pointer; }
-    label.toggle:hover { color: var(--text); }
+  #error-summary {
+    background: #1a0808; border: 1px solid #e82020;
+    padding: 10px 12px; margin-bottom: 16px; display: none;
+  }
+  #error-summary h3 { color: #e82020; margin-bottom: 6px; font-size: 12px; }
+  #error-summary li { color: #cc8888; margin: 2px 0 2px 16px; font-size: 11px; }
 
-    #stats { color: var(--muted); font-size: 11px; margin-left: auto; }
-
-    /* ── Tabs ─────────────────────────────────────────────────── */
-    #tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 3px;
-    }
-
-    .tab {
-      padding: 4px 14px;
-      border: 1px solid var(--border);
-      background: var(--surface2);
-      color: var(--muted);
-      cursor: pointer;
-      transition: all 0.12s;
-      white-space: nowrap;
-    }
-    .tab:hover { color: var(--text); border-color: var(--muted); }
-    .tab.active {
-      background: var(--accent);
-      color: #000;
-      border-color: var(--accent);
-      font-weight: bold;
-    }
-    .tab .count {
-      font-size: 10px;
-      opacity: 0.65;
-      margin-left: 4px;
-    }
-
-    /* ── Main grid area ───────────────────────────────────────── */
-    #main { padding: 16px; }
-
-    .sheet-section { margin-bottom: 24px; }
-
-    .sheet-heading {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 5px 10px;
-      background: var(--surface2);
-      border-left: 3px solid var(--muted);
-      margin-bottom: 8px;
-      color: var(--accent2);
-      font-size: 11px;
-    }
-    .sheet-heading .sheet-count {
-      color: var(--muted);
-      margin-left: auto;
-    }
-
-    .sprite-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: flex-start;
-    }
-
-    /* ── Sprite item ──────────────────────────────────────────── */
-    .sprite-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      padding: 5px;
-      background: var(--surface2);
-      border: 1px solid transparent;
-      cursor: default;
-      transition: border-color 0.1s;
-      position: relative;
-    }
-    .sprite-item:hover { border-color: var(--muted); }
-
-    .sprite-item canvas {
-      display: block;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-    }
-
-    /* Red outline for UNKNOWN — on the canvas itself */
-    .sprite-item.unknown canvas {
-      outline: 1px solid var(--red);
-    }
-
-    .sprite-label {
-      color: var(--muted);
-      font-size: 9px;
-      text-align: center;
-      max-width: 120px;
-      word-break: break-all;
-      line-height: 1.3;
-    }
-    .sprite-item:hover .sprite-label { color: var(--text); }
-    .sprite-item.unknown .sprite-label { color: var(--red); }
-
-    .anim-badge {
-      font-size: 8px;
-      color: var(--green);
-      line-height: 1;
-    }
-
-    /* ── Messages ─────────────────────────────────────────────── */
-    .message {
-      padding: 32px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.8;
-    }
-    .message code {
-      background: var(--surface2);
-      padding: 2px 6px;
-      color: var(--accent);
-      border: 1px solid var(--border);
-    }
-    .message .err { color: var(--red); margin-bottom: 12px; font-size: 15px; }
-
-    /* ── Tooltip ──────────────────────────────────────────────── */
-    #tooltip {
-      position: fixed;
-      bottom: 16px;
-      right: 16px;
-      background: var(--surface3);
-      border: 1px solid var(--border);
-      padding: 8px 12px;
-      font-size: 11px;
-      color: var(--text);
-      max-width: 360px;
-      line-height: 1.6;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.1s;
-      z-index: 300;
-      white-space: pre;
-    }
-    #tooltip.visible { opacity: 1; }
-    #tooltip .key { color: var(--muted); }
-    #tooltip .val { color: var(--accent2); }
-  </style>
+  #loading {
+    position: fixed; inset: 0; background: #0d0d14;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 1000; gap: 12px;
+  }
+  #loading h2 { color: #c89020; letter-spacing: 4px; }
+  #loading p { color: #666; font-size: 11px; }
+  #load-bar { width: 300px; height: 4px; background: #1e1e2e; }
+  #load-fill { height: 100%; background: #c89020; width: 0%; transition: width 0.1s; }
+</style>
 </head>
 <body>
 
-<div id="header">
-  <div id="title">&#9654; SPRITE ATLAS DEBUGGER &mdash; THE FORGOTTEN REALM</div>
-  <div id="controls">
-    <input type="text" id="search" placeholder="Filter by id…" autocomplete="off" spellcheck="false">
-
-    <div class="control-group">
-      <span class="control-label">Scale:</span>
-      <input type="range" id="scale-slider" min="1" max="6" value="3" step="1">
-      <span id="scale-val">3×</span>
-    </div>
-
-    <label class="toggle">
-      <input type="checkbox" id="animate-toggle"> Animate
-    </label>
-
-    <span id="stats"></span>
-  </div>
-  <div id="tabs"></div>
+<div id="loading">
+  <h2>ATLAS DEBUGGER</h2>
+  <p id="load-label">Loading sprite_atlas.json…</p>
+  <div id="load-bar"><div id="load-fill"></div></div>
+  <p id="load-count"></p>
 </div>
+
+<div id="header" style="display:none">
+  <h1>SPRITE ATLAS DEBUGGER</h1>
+  <div id="stats">
+    Entries: <span id="stat-total">0</span> &nbsp;|&nbsp;
+    OK: <span id="stat-ok" style="color:#7ab648">0</span> &nbsp;|&nbsp;
+    Errors: <span id="stat-err" style="color:#e82020">0</span>
+  </div>
+  <div id="filter-bar">
+    <input id="search" type="text" placeholder="Search sprite id…">
+    <div id="cat-buttons"></div>
+  </div>
+</div>
+<div id="progress-bar"><div id="progress-fill"></div></div>
 
 <div id="main">
-  <div class="message">Loading atlas…</div>
+  <div id="error-summary"><h3>Errors</h3><ul id="error-list"></ul></div>
+  <div id="sections"></div>
 </div>
-
 <div id="tooltip"></div>
 
 <script>
-/* ─────────────────────────────────────────────────────────────────────────
-   State
-───────────────────────────────────────────────────────────────────────── */
-let atlas        = null;
-let activeTab    = null;
-let filterText   = '';
-let scale        = 3;
-let doAnimate    = false;
+'use strict';
 
-const imgCache     = new Map();   // src → Promise<HTMLImageElement>
-const animHandles  = new Set();   // setInterval IDs to cancel on re-render
+const ATLAS_PATH   = 'sprite_atlas.json';
+const DISPLAY_SIZE = 48;
+const MAX_SCALE    = 3;
+const CAT_ORDER    = ['terrain','dungeon','character','creature','fx','item','ui'];
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Image loading
-───────────────────────────────────────────────────────────────────────── */
-function loadImage(src) {
-  if (!imgCache.has(src)) {
-    const p = new Promise((res, rej) => {
+let atlas = {}, imgCache = {}, errors = [], animHandles = [];
+let currentCat = 'all', searchTerm = '';
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+(async function boot() {
+  let atlasData;
+  try {
+    const r = await fetch(ATLAS_PATH);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    atlasData = await r.json();
+  } catch(e) {
+    document.getElementById('load-label').textContent = 'ERROR: ' + e;
+    document.getElementById('load-label').style.color = '#e82020';
+    return;
+  }
+  atlas = atlasData;
+
+  const files = [...new Set(
+    Object.values(atlas).flat().map(e => e.file)
+  )];
+  document.getElementById('load-label').textContent = 'Loading ' + files.length + ' sprite sheets…';
+
+  let n = 0;
+  await Promise.all(files.map(fp =>
+    new Promise(res => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload  = () => res(img);
-      img.onerror = () => rej(new Error('Cannot load ' + src));
-      img.src = src;
-    });
-    imgCache.set(src, p);
-  }
-  return imgCache.get(src);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Frame width heuristic
-   Handles two atlas conventions:
-     A) sw = total strip width, frame_w = sw / frames  (characters, particles)
-     B) sw = single frame,      frame_w = sw            (FX elemental/magic)
-───────────────────────────────────────────────────────────────────────── */
-function frameWidth(entry) {
-  if (entry.frames <= 1) return entry.sw;
-  const perFrame = entry.sw / entry.frames;
-  // If dividing produces a frame at least 40% of the sprite height → convention A
-  return (perFrame >= entry.sh * 0.4) ? perFrame : entry.sw;
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Canvas drawing
-───────────────────────────────────────────────────────────────────────── */
-function drawCheckerboard(ctx, w, h) {
-  const size = 8;
-  for (let y = 0; y < h; y += size) {
-    for (let x = 0; x < w; x += size) {
-      ctx.fillStyle = ((Math.floor(y / size) + Math.floor(x / size)) % 2 === 0)
-        ? '#151528' : '#1e1e38';
-      ctx.fillRect(x, y, size, size);
-    }
-  }
-}
-
-function renderFrame(ctx, img, entry, frameIndex) {
-  const fw   = frameWidth(entry);
-  const isFxConvention = fw === entry.sw;           // convention B: sw is one frame
-  const srcX = isFxConvention
-    ? entry.sx + frameIndex * entry.sw              // B: step by sw
-    : entry.sx + frameIndex * fw;                   // A: step by fw within strip
-  const dw = fw * scale;
-  const dh = entry.sh * scale;
-  drawCheckerboard(ctx, dw, dh);
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(img, srcX, entry.sy, fw, entry.sh, 0, 0, dw, dh);
-}
-
-function startDraw(canvas, entry, img) {
-  const fw = frameWidth(entry);
-  const dw = fw   * scale;
-  const dh = entry.sh * scale;
-  canvas.width  = dw;
-  canvas.height = dh;
-  const ctx = canvas.getContext('2d');
-
-  if (!entry.animated || !doAnimate || entry.frames <= 1) {
-    renderFrame(ctx, img, entry, 0);
-    return;
-  }
-
-  let frame = 0;
-  const fd = entry.frameDuration || 150;
-  renderFrame(ctx, img, entry, 0);
-  const id = setInterval(() => {
-    if (!document.body.contains(canvas)) { clearInterval(id); return; }
-    frame = (frame + 1) % entry.frames;
-    renderFrame(ctx, img, entry, frame);
-  }, fd);
-  animHandles.add(id);
-  canvas.__animId = id;
-}
-
-function initCanvas(canvas, entry) {
-  const fw = frameWidth(entry);
-  canvas.width  = fw * scale;
-  canvas.height = entry.sh * scale;
-  const ctx = canvas.getContext('2d');
-  drawCheckerboard(ctx, canvas.width, canvas.height);
-
-  loadImage(entry.file)
-    .then(img => startDraw(canvas, entry, img))
-    .catch(() => {
-      const ctx2 = canvas.getContext('2d');
-      ctx2.fillStyle = '#300';
-      ctx2.fillRect(0, 0, canvas.width, canvas.height);
-      ctx2.fillStyle = '#f44';
-      ctx2.font = `${Math.max(8, scale * 4)}px monospace`;
-      ctx2.fillText('ERR', 2, canvas.height / 2 + 3);
-    });
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   IntersectionObserver — lazy draw
-───────────────────────────────────────────────────────────────────────── */
-let observer = null;
-
-function makeObserver() {
-  if (observer) observer.disconnect();
-  observer = new IntersectionObserver(entries => {
-    for (const oe of entries) {
-      if (oe.isIntersecting && !oe.target.__drawn) {
-        oe.target.__drawn = true;
-        initCanvas(oe.target, oe.target.__entry);
-        observer.unobserve(oe.target);
+      img.onload  = () => { imgCache[fp] = img; done(); };
+      img.onerror = () => { imgCache[fp] = null; done(); };
+      img.src = fp;
+      function done() {
+        n++;
+        document.getElementById('load-fill').style.width = (n/files.length*100) + '%';
+        document.getElementById('load-count').textContent = n + ' / ' + files.length;
+        res();
       }
+    })
+  ));
+
+  document.getElementById('loading').style.display  = 'none';
+  document.getElementById('header').style.display   = 'flex';
+  buildUI();
+})();
+
+// ── Render one entry to a canvas, return { ok, reason } ──────────────────────
+function renderEntry(e, cvs) {
+  const ctx = cvs.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+  const img = imgCache[e.file];
+  if (!img) return { ok: false, reason: 'Sheet failed to load: ' + e.file };
+
+  const isSingle = (e.type === 'single');
+  const sx = e.sx || 0;
+  const sy = e.sy || 0;
+  const sw = isSingle ? img.naturalWidth  : (e.sw || 16);
+  const sh = isSingle ? img.naturalHeight : (e.sh || 16);
+  const frames = e.frames || 1;
+
+  if (!isSingle) {
+    if (sx + sw * frames > img.naturalWidth || sy + sh > img.naturalHeight) {
+      return {
+        ok: false,
+        reason: `Out of bounds: sx=${sx} sy=${sy} sw=${sw} sh=${sh} frames=${frames} — sheet is ${img.naturalWidth}×${img.naturalHeight}`
+      };
     }
-  }, { rootMargin: '400px' });
-  return observer;
+  }
+
+  const scale = Math.min(DISPLAY_SIZE / sw, DISPLAY_SIZE / sh, MAX_SCALE);
+  const dw = Math.round(sw * scale);
+  const dh = Math.round(sh * scale);
+  const ox = Math.floor((DISPLAY_SIZE - dw) / 2);
+  const oy = Math.floor((DISPLAY_SIZE - dh) / 2);
+  ctx.drawImage(img, sx, sy, sw, sh, ox, oy, dw, dh);
+  return { ok: true, sw, sh };
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Sprite item DOM
-───────────────────────────────────────────────────────────────────────── */
-const tooltip = document.getElementById('tooltip');
+// ── Animated preview ─────────────────────────────────────────────────────────
+function startAnim(e, cvs) {
+  const img = imgCache[e.file];
+  if (!img || (e.frames || 1) <= 1) return;
+  const sw = e.sw || 16, sh = e.sh || 16;
+  const sx0 = e.sx || 0, sy = e.sy || 0;
+  const dur = e.frameDuration || 150;
+  const scale = Math.min(DISPLAY_SIZE/sw, DISPLAY_SIZE/sh, MAX_SCALE);
+  const dw = Math.round(sw*scale), dh = Math.round(sh*scale);
+  const ox = Math.floor((DISPLAY_SIZE-dw)/2), oy = Math.floor((DISPLAY_SIZE-dh)/2);
+  let frame = 0, last = 0;
+  function tick(now) {
+    if (now - last >= dur) {
+      last = now;
+      frame = (frame + 1) % e.frames;
+      const ctx = cvs.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+      ctx.drawImage(img, sx0 + frame * sw, sy, sw, sh, ox, oy, dw, dh);
+    }
+    animHandles.push(requestAnimationFrame(tick));
+  }
+  animHandles.push(requestAnimationFrame(tick));
+}
 
-function buildItem(entry) {
-  const isUnknown = entry.id.startsWith('UNKNOWN');
-  const fw = frameWidth(entry);
-
-  const item = document.createElement('div');
-  item.className = 'sprite-item' + (isUnknown ? ' unknown' : '');
-
-  const canvas = document.createElement('canvas');
-  canvas.width  = fw  * scale;
-  canvas.height = entry.sh * scale;
-  canvas.__entry = entry;
-  canvas.__drawn = false;
-
-  // draw checkerboard placeholder
-  const ctx = canvas.getContext('2d');
-  drawCheckerboard(ctx, canvas.width, canvas.height);
-
-  // tooltip on hover
-  item.addEventListener('mouseenter', () => {
-    tooltip.innerHTML =
-      `<span class="key">id         </span><span class="val">${entry.id}</span>\n` +
-      `<span class="key">sheet      </span><span class="val">${entry.sheet}</span>\n` +
-      `<span class="key">file       </span><span class="val">${entry.file}</span>\n` +
-      `<span class="key">src rect   </span><span class="val">sx:${entry.sx} sy:${entry.sy} sw:${entry.sw} sh:${entry.sh}</span>\n` +
-      `<span class="key">animated   </span><span class="val">${entry.animated ? `yes — ${entry.frames} frames @ ${entry.frameDuration||'?'}ms` : 'no'}</span>`;
-    tooltip.classList.add('visible');
+// ── Build UI ─────────────────────────────────────────────────────────────────
+function buildUI() {
+  const cb = document.getElementById('cat-buttons');
+  ['all', ...CAT_ORDER].forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-btn' + (cat === 'all' ? ' active' : '');
+    btn.textContent = cat === 'all' ? 'ALL' : cat.toUpperCase();
+    btn.dataset.cat = cat;
+    btn.onclick = () => {
+      currentCat = cat;
+      document.querySelectorAll('.cat-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.cat === cat));
+      render();
+    };
+    cb.appendChild(btn);
   });
-  item.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
-
-  observer.observe(canvas);
-
-  const label = document.createElement('div');
-  label.className = 'sprite-label';
-  label.textContent = entry.id;
-
-  item.appendChild(canvas);
-
-  if (entry.animated) {
-    const badge = document.createElement('div');
-    badge.className = 'anim-badge';
-    badge.textContent = `▶ ${entry.frames}f`;
-    item.appendChild(badge);
-  }
-
-  item.appendChild(label);
-  return item;
+  document.getElementById('search').oninput = e => {
+    searchTerm = e.target.value.toLowerCase();
+    render();
+  };
+  render();
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Render category
-───────────────────────────────────────────────────────────────────────── */
-function clearAnimations() {
-  for (const id of animHandles) clearInterval(id);
-  animHandles.clear();
-}
+function render() {
+  animHandles.forEach(cancelAnimationFrame);
+  animHandles = [];
+  errors = [];
 
-function renderCategory(cat) {
-  clearAnimations();
-  makeObserver();
+  const sections = document.getElementById('sections');
+  sections.innerHTML = '';
+  let total = 0;
 
-  const main = document.getElementById('main');
-  main.innerHTML = '';
+  for (const cat of CAT_ORDER) {
+    if (currentCat !== 'all' && currentCat !== cat) continue;
+    const entries = (atlas[cat] || []).filter(e =>
+      !searchTerm || e.id.toLowerCase().includes(searchTerm)
+    );
+    if (!entries.length) continue;
 
-  const entries = atlas[cat] || [];
-  const filter  = filterText;
-  const visible = filter ? entries.filter(e => e.id.toLowerCase().includes(filter)) : entries;
-
-  // group by sheet
-  const bySheet = new Map();
-  for (const e of visible) {
-    if (!bySheet.has(e.sheet)) bySheet.set(e.sheet, []);
-    bySheet.get(e.sheet).push(e);
-  }
-
-  const statsEl = document.getElementById('stats');
-  statsEl.textContent = `${visible.length} / ${entries.length} sprites · ${bySheet.size} sheets`;
-
-  if (visible.length === 0) {
-    main.innerHTML = '<div class="message">No sprites match the current filter.</div>';
-    return;
-  }
-
-  const frag = document.createDocumentFragment();
-
-  for (const [sheet, items] of bySheet) {
-    const section = document.createElement('div');
-    section.className = 'sheet-section';
-
-    const heading = document.createElement('div');
-    heading.className = 'sheet-heading';
-    heading.innerHTML = `<span>${sheet}</span><span class="sheet-count">${items.length} sprites</span>`;
-    section.appendChild(heading);
+    const sec = document.createElement('div');
+    sec.className = 'cat-section';
+    const title = document.createElement('div');
+    title.className = 'cat-title';
+    title.innerHTML = cat + ' <span>(' + entries.length + ')</span>';
+    sec.appendChild(title);
 
     const grid = document.createElement('div');
     grid.className = 'sprite-grid';
-    for (const entry of items) {
-      grid.appendChild(buildItem(entry));
+
+    for (const e of entries) {
+      const card = document.createElement('div');
+      card.className = 'sprite-card';
+
+      const wrap = document.createElement('div');
+      wrap.className = 'canvas-wrap';
+      const cvs = document.createElement('canvas');
+      cvs.width = cvs.height = DISPLAY_SIZE;
+      const errFlag = document.createElement('div');
+      errFlag.className = 'err-flag';
+      errFlag.textContent = '✖';
+      wrap.append(cvs, errFlag);
+
+      const result = renderEntry(e, cvs);
+
+      if (!result.ok) {
+        card.classList.add('error');
+        errors.push({ id: e.id, file: e.file, reason: result.reason });
+      } else {
+        startAnim(e, cvs);
+      }
+
+      const img = imgCache[e.file];
+      let meta;
+      if (e.type === 'single') {
+        meta = img ? img.naturalWidth + '×' + img.naturalHeight : 'load-err';
+      } else {
+        meta = (e.sw || '?') + '×' + (e.sh || '?');
+        if ((e.frames||1) > 1) meta += ' ×' + e.frames;
+      }
+
+      const label = document.createElement('div');
+      label.className = 'sprite-label';
+      label.textContent = e.id;
+
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'sprite-meta';
+      metaDiv.textContent = result.ok ? meta : 'ERROR';
+
+      card.append(wrap, label, metaDiv);
+      card.addEventListener('mouseenter', () => showTip(e, result, img));
+      card.addEventListener('mouseleave',  hideTip);
+      grid.appendChild(card);
+      total++;
     }
-    section.appendChild(grid);
-    frag.appendChild(section);
+
+    sec.appendChild(grid);
+    sections.appendChild(sec);
   }
 
-  main.appendChild(frag);
-}
+  // Stats
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-ok').textContent    = total - errors.length;
+  document.getElementById('stat-err').textContent   = errors.length;
+  document.getElementById('progress-fill').style.width = '100%';
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Tab switch
-───────────────────────────────────────────────────────────────────────── */
-function switchTab(cat) {
-  activeTab = cat;
-  document.querySelectorAll('.tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.cat === cat));
-  renderCategory(cat);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Init
-───────────────────────────────────────────────────────────────────────── */
-async function init() {
-  // Load atlas
-  let data;
-  try {
-    const res = await fetch('sprite_atlas.json');
-    if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
-    data = await res.json();
-  } catch (err) {
-    document.getElementById('main').innerHTML = `
-      <div class="message">
-        <div class="err">⚠ Could not load sprite_atlas.json</div>
-        Serve this file via a local HTTP server from the <strong>Assignment 10</strong> folder:<br><br>
-        <code>python -m http.server 8000</code><br><br>
-        Then open <code>http://localhost:8000/atlas_debugger.html</code><br><br>
-        <small style="color:#5858a0">${err}</small>
-      </div>`;
-    return;
+  // Error summary
+  const errDiv  = document.getElementById('error-summary');
+  const errList = document.getElementById('error-list');
+  errList.innerHTML = '';
+  if (errors.length) {
+    errDiv.style.display = 'block';
+    errors.forEach(err => {
+      const li = document.createElement('li');
+      li.textContent = '[' + err.id + '] — ' + err.reason;
+      errList.appendChild(li);
+    });
+  } else {
+    errDiv.style.display = 'none';
   }
-  atlas = data;
-
-  // Build tabs
-  const tabsEl = document.getElementById('tabs');
-  const ICONS = { terrain:'🌿', dungeon:'🏚', character:'🧍', creature:'🐉', fx:'✨', item:'🗡️', ui:'🖼' };
-  for (const [cat, items] of Object.entries(atlas)) {
-    const tab = document.createElement('div');
-    tab.className = 'tab';
-    tab.dataset.cat = cat;
-    tab.innerHTML = `${ICONS[cat] || ''} ${cat}<span class="count">${items.length}</span>`;
-    tab.addEventListener('click', () => switchTab(cat));
-    tabsEl.appendChild(tab);
-  }
-
-  // Scale slider
-  const slider = document.getElementById('scale-slider');
-  slider.addEventListener('input', () => {
-    scale = +slider.value;
-    document.getElementById('scale-val').textContent = scale + '×';
-    if (activeTab) renderCategory(activeTab);
-  });
-
-  // Animate toggle
-  document.getElementById('animate-toggle').addEventListener('change', e => {
-    doAnimate = e.target.checked;
-    if (activeTab) renderCategory(activeTab);
-  });
-
-  // Search
-  let debounce;
-  document.getElementById('search').addEventListener('input', e => {
-    clearTimeout(debounce);
-    debounce = setTimeout(() => {
-      filterText = e.target.value.toLowerCase().trim();
-      if (activeTab) renderCategory(activeTab);
-    }, 200);
-  });
-
-  // First tab
-  const firstCat = Object.keys(atlas)[0];
-  switchTab(firstCat);
 }
 
-init();
+// ── Tooltip ──────────────────────────────────────────────────────────────────
+function showTip(e, result, img) {
+  const tt = document.getElementById('tooltip');
+  const shDims = img ? img.naturalWidth + '×' + img.naturalHeight : 'N/A';
+  const sw = e.type === 'single' ? (img ? img.naturalWidth : 'N/A') : (e.sw || '?');
+  const sh = e.type === 'single' ? (img ? img.naturalHeight : 'N/A') : (e.sh || '?');
+  let html = `<div class="tt-id">${e.id}</div>`;
+  html += `<div class="tt-file">${e.file}</div>`;
+  html += `<div>type: <b>${e.type||'sheet'}</b> | sheet: ${shDims}</div>`;
+  html += `<div>sx=${e.sx||0}  sy=${e.sy||0}  sw=${sw}  sh=${sh}</div>`;
+  if ((e.frames||1) > 1) html += `<div>frames: ${e.frames}  dur: ${e.frameDuration}ms</div>`;
+  if (!result.ok) html += `<div class="tt-err">✖ ${result.reason}</div>`;
+  tt.innerHTML = html;
+  tt.style.display = 'block';
+}
+function hideTip() { document.getElementById('tooltip').style.display = 'none'; }
 </script>
 </body>
 </html>
