@@ -52,33 +52,21 @@
 // ─── SHEET REGISTRY ──────────────────────────────────────────────────────────
 const SHEET_PATHS = Object.freeze({
 
-    // ── OUTDOOR / OVERWORLD ───────────────────────────────────────
-    VILLAGE:         '/graphics/Outer World/SERENE_VILLAGE_REVAMPED/Serene_Village_48x48.png',
-    WATER_ANIM:      '/graphics/Outer World/SERENE_VILLAGE_REVAMPED/Animated stuff/water_waves_48x48.png',
-    DOOR_ANIM:       '/graphics/Outer World/SERENE_VILLAGE_REVAMPED/Animated stuff/door_48x48.png',
-
-    // ── INTERIOR ─────────────────────────────────────────────────
-    INTERIORS:       '/graphics/Indoor & Dungeon/Modern tiles_Free/Interiors_free/48x48/Interiors_free_48x48.png',
-    ROOM_BUILDER:    '/graphics/Indoor & Dungeon/Modern tiles_Free/Interiors_free/48x48/Room_Builder_free_48x48.png',
-
-    // ── DUNGEON ───────────────────────────────────────────────────
-    KENNEY:          '/graphics/Indoor & Dungeon/Kenny-Rougelike/Spritesheet/roguelikeSheet_transparent.png',
-
     // ── PLAYER — one sheet per character class ────────────────────
-    CHAR_KNIGHT:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Knight/SpriteSheet.png',
-    CHAR_NINJA_BLUE: '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/NinjaBlue/SpriteSheet.png',
-    CHAR_SORCERER:   '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/SorcererBlack/SpriteSheet.png',
-    CHAR_MONK:       '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Monk2/SpriteSheet.png',
+    CHAR_KNIGHT:     '/assets/characters/Actor/Character/Knight/SpriteSheet.png',
+    CHAR_NINJA_BLUE: '/assets/characters/Actor/Character/NinjaBlue/SpriteSheet.png',
+    CHAR_SORCERER:   '/assets/characters/Actor/Character/SorcererBlack/SpriteSheet.png',
+    CHAR_MONK:       '/assets/characters/Actor/Character/Monk2/SpriteSheet.png',
 
     // ── NPC CHARACTERS ────────────────────────────────────────────
-    CHAR_BOY:        '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Boy/SpriteSheet.png',
-    CHAR_OLDMAN:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/OldMan2/SpriteSheet.png',
-    CHAR_FIGHTER:    '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/FighterRed/SpriteSheet.png',
-    CHAR_NOBLE:      '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Noble/SpriteSheet.png',
-    CHAR_SPIRIT:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Spirit/SpriteSheet.png',
+    CHAR_BOY:        '/assets/characters/Actor/Character/Boy/SpriteSheet.png',
+    CHAR_OLDMAN:     '/assets/characters/Actor/Character/OldMan2/SpriteSheet.png',
+    CHAR_FIGHTER:    '/assets/characters/Actor/Character/FighterRed/SpriteSheet.png',
+    CHAR_NOBLE:      '/assets/characters/Actor/Character/Noble/SpriteSheet.png',
+    CHAR_SPIRIT:     '/assets/characters/Actor/Character/Spirit/SpriteSheet.png',
 
     // ── ENEMIES ───────────────────────────────────────────────────
-    ENEMY_SHADE:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/NinjaDark/SpriteSheet.png',
+    ENEMY_SHADE:     '/assets/characters/Actor/Character/NinjaDark/SpriteSheet.png',
     ENEMY_LURKER:    null,   // procedural fallback
 });
 
@@ -114,297 +102,206 @@ function n(col, row) {
 
 // ═══════════════════════════════════════════════════════════════════
 //  TILE_MANIFEST
+//
+//  Village tiles (GRASS, PATH, WATER, DOOR, TORCH, TREE, SIGN) use
+//  the atlas-ID format: { ids: [...] } or { animId, frameCount }.
+//  All coordinates are resolved at runtime via SpriteRenderer.getSprite(id).
+//
+//  Interior/dungeon tiles still use the legacy { sheet, variants } format
+//  but those sheets don't exist yet, so they fall through to procedural.
 // ═══════════════════════════════════════════════════════════════════
 const TILE_MANIFEST = {
 
     // ─────────────────────────────────────────────────────────────
     //  GRASS  (TILE.GRASS = 0)
-    //  Sheet: Serene Village — rows 0–1, various cols.
-    //
-    //  Verified pixel colours (mean RGB, alpha=255 for all):
-    //    v(4,0): (120,200,102)  plain bright green ✓
-    //    v(3,0): (120,200,102)  plain bright green ✓
-    //    v(5,0): (120,200,102)  plain bright green ✓
-    //    v(7,1): (162,175, 89)  medium olive green  ✓
-    //    v(8,1): (162,175, 89)  medium olive green  ✓
-    //    v(17,0):(166,174, 90)  dry/yellower green  ✓
-    //    v(18,0):(157,178, 93)  dry/yellower        ✓
-    //    v(17,1):(130,198,103)  bright green        ✓
+    //  Source: sprite_atlas.json → Serene_Village_16x16.png
+    //  8 variants picked by (tx*7 + ty*13) & 7
     // ─────────────────────────────────────────────────────────────
     GRASS: {
-        sheet: 'VILLAGE',
-        variants: [
-            v(4,  0),   // 0 — plain bright grass
-            v(3,  0),   // 1 — plain grass (slight left shift)
-            v(5,  0),   // 2 — plain grass (slight right shift)
-            v(7,  1),   // 3 — medium olive green
-            v(8,  1),   // 4 — medium olive green
-            v(17, 0),   // 5 — dry / yellower
-            v(18, 0),   // 6 — dry / yellower variant
-            v(17, 1),   // 7 — bright summer green
+        ids: [
+            'grass_center',       // 0
+            'grass_center',       // 1 (duplicate for density)
+            'grass_top',          // 2
+            'grass_bottom',       // 3
+            'grass_left',         // 4
+            'grass_right',        // 5
+            'grass_corner_tl',    // 6
+            'grass_corner_tr',    // 7
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  PATH  (TILE.PATH = 1)
-    //  Sheet: Serene Village — sandy/tan tiles from dock area row 1–2.
-    //  These read as golden-sandy (196,159,82) which gives an
-    //  earthy dirt-path appearance — appropriate for RPG outdoor paths.
-    //
-    //  Verified: v(6,1) v(9,1) v(6,2) v(9,2) all alpha=255 ✓
+    //  4 variants picked by (tx*11 + ty*7) & 3
     // ─────────────────────────────────────────────────────────────
     PATH: {
-        sheet: 'VILLAGE',
-        variants: [
-            v(6, 1),   // 0 — sandy-earth path
-            v(9, 1),   // 1 — sandy-earth path
-            v(6, 2),   // 2 — slightly lighter
-            v(9, 2),   // 3 — slightly lighter variant
+        ids: [
+            'dirt_path_cross',    // 0 — crossroads
+            'dirt_center',        // 1 — plain dirt
+            'dirt_path_h',        // 2 — horizontal path
+            'dirt_path_v',        // 3 — vertical path
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  FLOOR_LIGHT — light interior floor  (TILE.FLOOR, dark=false)
-    //  Sheet: Room Builder — warm/cream band row 7–8 + wood row 11 + stone row 19.
-    //
-    //  Verified colours (all alpha=255):
-    //    i(0, 7): (207,196,159)  cream/warm golden floor ✓
-    //    i(7, 7): (218,207,169)  cream lighter centre     ✓
-    //    i(0,11): (177,147,120)  light warm wood plank    ✓
-    //    i(0,19): (179,178,172)  neutral stone floor      ✓
+    //  Legacy format — falls through to procedural until interior
+    //  atlas entries are mapped.
     // ─────────────────────────────────────────────────────────────
     FLOOR_LIGHT: {
-        sheet: 'ROOM_BUILDER',
-        variants: [
-            i(0,  7),   // 0 — cream / warm golden floor
-            i(7,  7),   // 1 — cream lighter centre variant
-            i(0, 11),   // 2 — light warm wood plank
-            i(0, 19),   // 3 — neutral stone floor
+        ids: [
+            'path_stone_c',   // 0 — stone floor (best available stand-in)
+            'path_stone_c',   // 1
+            'path_stone_c',   // 2
+            'path_stone_c',   // 3
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  FLOOR_DARK — dark dungeon floor  (TILE.FLOOR, dark=true)
-    //  Sheet: Kenney — brown earth tiles cols 5–9 rows 3–4.
-    //
-    //  Verified colours (all alpha=255):
-    //    k(5,3): (176,132, 89)  brown earth ✓
-    //    k(8,3): (175,129, 84)  brown earth ✓
-    //    k(5,4): (179,134, 90)  slightly lighter ✓
-    //    k(8,4): (181,136, 92)  brown earth ✓
     // ─────────────────────────────────────────────────────────────
     FLOOR_DARK: {
-        sheet: 'KENNEY',
-        variants: [
-            k(5, 3),   // 0 — brown earth dungeon floor
-            k(8, 3),   // 1 — brown earth variant
-            k(5, 4),   // 2 — slightly lighter brown
-            k(8, 4),   // 3 — brown earth variant
+        ids: [
+            'dirt_center',    // 0
+            'dirt_center',    // 1
+            'sand_dark',      // 2
+            'dirt_center',    // 3
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  WALL_EXT — exterior stone  (TILE.WALL, outdoor map)
-    //  Sheet: Room Builder — dark neutral grey tiles cols 14–16 rows 5–11.
-    //  These are fully-opaque (~alpha 255) grey-stone panels.
-    //
-    //  Verified colours:
-    //    i(14, 5): (141,131,130) alpha=255  neutral grey ✓
-    //    i(14, 7): (133,125,125) alpha=255  dark grey    ✓
-    //    i(14, 9): (131,122,122) alpha=255  dark grey    ✓
-    //    i(14,11): (122,114,114) alpha=255  darker grey  ✓
     // ─────────────────────────────────────────────────────────────
     WALL_EXT: {
-        sheet: 'ROOM_BUILDER',
-        variants: [
-            i(14,  5),  // 0 — neutral grey stone
-            i(14,  7),  // 1 — dark grey stone
-            i(14,  9),  // 2 — dark grey variant
-            i(14, 11),  // 3 — darker grey
+        ids: [
+            'building_row10_col0',   // 0
+            'building_row10_col1',   // 1
+            'building_row10_col2',   // 2
+            'building_row10_col3',   // 3
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
-    //  WALL_INT — interior wood plank  (TILE.WALL, interior map)
-    //  Sheet: Room Builder — warm wood bands rows 11–14.
-    //
-    //  Verified colours (all alpha=255):
-    //    i(0,11): (177,147,120)  warm light wood ✓
-    //    i(7,11): (188,158,129)  warm light wood lighter ✓
-    //    i(0,13): (154,130,123)  medium wood / worn ✓
-    //    i(7,13): (165,141,133)  medium wood lighter ✓
+    //  WALL_INT — interior wall  (TILE.WALL, interior map)
     // ─────────────────────────────────────────────────────────────
     WALL_INT: {
-        sheet: 'ROOM_BUILDER',
-        variants: [
-            i(0, 11),   // 0 — warm light wood plank
-            i(7, 11),   // 1 — warm wood lighter centre
-            i(0, 13),   // 2 — medium / worn wood
-            i(7, 13),   // 3 — medium wood lighter
+        ids: [
+            'building_row13_col0',   // 0
+            'building_row13_col1',   // 1
+            'building_row13_col2',   // 2
+            'building_row13_col5',   // 3
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  WALL_DUN — dungeon hewn rock  (TILE.WALL, dark map)
-    //  Sheet: Kenney — grey-blue stone tiles rows 0–2 cols 6–9.
-    //
-    //  Verified colours (all alpha=255):
-    //    k(7,0): (168,182,183) grey-blue stone ✓
-    //    k(9,0): (170,184,185) grey-blue stone ✓
-    //    k(6,2): (190,190,190) light grey stone ✓
-    //    k(7,1): (168,182,183) grey-blue stone ✓
     // ─────────────────────────────────────────────────────────────
     WALL_DUN: {
-        sheet: 'KENNEY',
-        variants: [
-            k(7, 0),   // 0 — grey-blue stone wall
-            k(9, 0),   // 1 — grey-blue stone variant
-            k(6, 2),   // 2 — light grey stone
-            k(7, 1),   // 3 — grey-blue stone (row 1 variant)
+        ids: [
+            'building_row14_col0',   // 0
+            'building_row14_col1',   // 1
+            'building_row14_col2',   // 2
+            'building_row14_col3',   // 3
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  CEILING — interior overhead  (TILE.WALL, isCeiling=true)
-    //  Sheet: Room Builder — near-white tiles cols 14–16 rows 0–2.
-    //  These are the explicit "room border / ceiling" tiles from
-    //  the Room Builder legend, alpha=255, near-white.
-    //
-    //  Verified colours (all alpha=255):
-    //    i(14,0): (216,216,220) light grey-white ✓
-    //    i(15,0): (219,219,223) light grey-white ✓
-    //    i(16,0): (216,216,220) light grey-white ✓
-    //    i(14,2): (227,227,230) near white       ✓
     // ─────────────────────────────────────────────────────────────
     CEILING: {
-        sheet: 'ROOM_BUILDER',
-        variants: [
-            i(14, 0),   // 0 — light grey ceiling
-            i(15, 0),   // 1 — light grey ceiling variant
-            i(16, 0),   // 2 — light grey ceiling
-            i(14, 2),   // 3 — near-white ceiling
+        ids: [
+            'building_row15_col0',   // 0
+            'building_row15_col1',   // 1
+            'building_row15_col10',  // 2
+            'building_row15_col11',  // 3
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  TREE  (TILE.TREE = 4)
-    //  Sheet: Serene Village — medium-green canopy tiles row 10.
-    //  isOverlay = true: SpriteRenderer draws GRASS first, then this.
-    //
-    //  Verified: v(15,10) v(16,10) both alpha=255,
-    //    rgb(111,147,85) and (110,146,84) — deep forest green ✓
+    //  isOverlay: SpriteRenderer draws GRASS first, then this on top.
+    //  2 variants picked by (tx*5 + ty*9) & 1
     // ─────────────────────────────────────────────────────────────
     TREE: {
-        sheet:     'VILLAGE',
-        isOverlay: true,
-        variants: [
-            v(15, 10),   // 0 — summer tree canopy (deep green)
-            v(16, 10),   // 1 — summer tree canopy variant
+        ids: [
+            'tree_large_tl',   // 0 — upper-left canopy quad
+            'tree_large_tm',   // 1 — upper-mid canopy quad
         ],
-        fallback: 'procedural',
+        isOverlay: true,
+        fallback:  'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  WATER  (TILE.WATER = 5)  — animated, 4 frames
-    //  Sheet: water_waves_48x48.png (672×48, 14 frames total).
-    //  Using first 4; all verified as blue water alpha=255 ✓
+    //  animId → atlas entry with frames=4 horizontal strip
     // ─────────────────────────────────────────────────────────────
     WATER: {
-        sheet:    'WATER_ANIM',
-        animated: true,
-        fps:      8,
-        frames: [
-            { sx:   0, sy: 0, sw: 48, sh: 48 },   // frame 0
-            { sx:  48, sy: 0, sw: 48, sh: 48 },   // frame 1
-            { sx:  96, sy: 0, sw: 48, sh: 48 },   // frame 2
-            { sx: 144, sy: 0, sw: 48, sh: 48 },   // frame 3
-        ],
-        fallback: 'procedural',
+        animId:     'water_waves',
+        frameCount: 4,
+        animated:   true,
+        fallback:   'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
-    //  DOOR  (TILE.DOOR = 6)  — animated
-    //  Sheet: door_48x48.png (192×48, 4 frames) — all verified ✓
+    //  DOOR  (TILE.DOOR = 6)  — animated, 4 frames
     // ─────────────────────────────────────────────────────────────
     DOOR: {
-        sheet:    'DOOR_ANIM',
-        animated: true,
-        fps:      6,
-        frames: [
-            { sx:   0, sy: 0, sw: 48, sh: 48 },   // frame 0 — closed
-            { sx:  48, sy: 0, sw: 48, sh: 48 },   // frame 1
-            { sx:  96, sy: 0, sw: 48, sh: 48 },   // frame 2
-            { sx: 144, sy: 0, sw: 48, sh: 48 },   // frame 3 — open
-        ],
-        fallback: 'procedural',
+        animId:     'door',
+        frameCount: 4,
+        animated:   true,
+        fallback:   'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  STAIRS DOWN  (TILE.STAIRS = 7)
-    //  Sheet: Kenney — brown/earth tile as dark-pit visual.
-    //  k(6,0): (178,129,83) alpha=255, brown earth ✓
     // ─────────────────────────────────────────────────────────────
     STAIRS: {
-        sheet: 'KENNEY',
-        variants: [
-            k(6, 0),   // dark earth / pit entrance
+        ids: [
+            'dirt_corner_bl',   // 0 — dark pit entrance
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  STAIRS UP  (TILE.STAIRSUP = 9)
-    //  Sheet: Kenney — cream/sandy tile as light-exit visual.
-    //  k(8,0): (228,216,189) alpha=255, cream stone ✓
     // ─────────────────────────────────────────────────────────────
     STAIRSUP: {
-        sheet: 'KENNEY',
-        variants: [
-            k(8, 0),   // cream stone / exit
+        ids: [
+            'path_stone_tl',   // 0 — stone exit marker
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  SIGN  (TILE.SIGN = 8)
-    //  Sheet: Serene Village — wooden sign tiles.
-    //  v(10,2): (206,156,79) alpha=255 brownish wood sign ✓
-    //  v(2,9):  (189,165,92) alpha=255 golden wood panel  ✓
-    //  v(3,9):  (189,165,92) alpha=255 golden wood panel  ✓
     // ─────────────────────────────────────────────────────────────
     SIGN: {
-        sheet: 'VILLAGE',
-        variants: [
-            v(10, 2),  // 0 — wall plaque (brownish wood)
-            v(2,  9),  // 1 — floor / post sign (golden wood)
-            v(3,  9),  // 2 — post sign variant
+        ids: [
+            'sign_post',    // 0 — post sign
+            'sign_arrow',   // 1 — arrow sign
+            'sign_post',    // 2 — post sign (reuse)
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
-    //  TORCH  (TILE.TORCH = 10)  — animated, 2 frames
-    //  Sheet: Kenney — warm candle/torch sprites row 6 cols 15–16.
-    //  k(15,6): (203,157, 94) alpha=220 warm orange-brown ✓
-    //  k(16,6): (184,159,104) alpha=217 warm orange-brown ✓
+    //  TORCH  (TILE.TORCH = 10)  — animated campfire, 2 frames used
+    //  animId uses campfire_16x16.png (4-frame strip); only frames
+    //  0 and 1 are requested by drawTile.
     // ─────────────────────────────────────────────────────────────
     TORCH: {
-        sheet:    'KENNEY',
-        animated: true,
-        fps:      8,
-        frames: [
-            k(15, 6),   // frame A — warm candle/torch
-            k(16, 6),   // frame B — torch flicker variant
-        ],
-        fallback: 'procedural',
+        animId:     'campfire',
+        frameCount: 2,
+        animated:   true,
+        fallback:   'procedural',
     },
 
 

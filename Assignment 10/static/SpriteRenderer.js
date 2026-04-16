@@ -60,6 +60,11 @@ class SpriteRenderer {
         // before isReady() flips true.
         this._requiredKeys = new Set();
 
+        // ── atlas state ───────────────────────────────────────────
+        // id → atlas entry { file, sx, sy, sw, sh, frames, ... }
+        this._atlasById   = new Map();
+        this._atlasLoaded = false;
+
         // ── animation state ──────────────────────────────────────
         this._waterFrame  = 0;
         this._waterAccum  = 0;          // ms accumulator
@@ -82,31 +87,58 @@ class SpriteRenderer {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Start loading every sheet in SHEET_PATHS.
+     * Start loading the sprite atlas JSON, then all tile image sheets.
+     * Character sheets (SHEET_PATHS) load in parallel but don't block isReady().
      * Safe to call multiple times — subsequent calls are no-ops.
      */
     loadAll() {
         if (this._loadStarted) return;
         this._loadStarted = true;
 
-        // Determine which sheet keys are needed to draw core map tiles.
-        // Character sheets load here too, but don't block isReady().
-        const CORE_TILE_KEYS = [
-            'GRASS', 'PATH', 'FLOOR_LIGHT', 'FLOOR_DARK',
-            'WALL_EXT', 'WALL_INT', 'WALL_DUN', 'CEILING',
-            'TREE', 'WATER', 'DOOR', 'TORCH', 'STAIRS', 'STAIRSUP', 'SIGN',
-        ];
-
-        for (const name of CORE_TILE_KEYS) {
-            const def = TILE_MANIFEST[name];
-            if (def?.sheet) this._requiredKeys.add(def.sheet);
-        }
-
-        // Fire off every load in parallel
+        // Character/NPC/enemy sheets — load in background, don't block isReady().
         for (const [key, path] of Object.entries(SHEET_PATHS)) {
-            if (!path) continue;   // null = deliberate no-match
+            if (!path) continue;
             if (!this._images.has(key)) this._startLoad(key, path);
         }
+
+        // Fetch sprite_atlas.json — required before isReady() can flip true.
+        fetch('/sprite_atlas.json')
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
+            .then(json => {
+                // Index every entry by id across all categories.
+                for (const entries of Object.values(json)) {
+                    if (!Array.isArray(entries)) continue;
+                    for (const e of entries) this._atlasById.set(e.id, e);
+                }
+                this._atlasLoaded = true;
+                this._loadAtlasSheets();  // load image files referenced by TILE_MANIFEST
+                this._checkReady();       // in case no atlas files are required
+            })
+            .catch(err => {
+                console.error('[SpriteRenderer] Failed to load sprite_atlas.json:', err);
+                this._atlasLoaded = true;  // don't stall isReady() forever
+                this._checkReady();
+            });
+    }
+
+    /**
+     * Looks up an atlas entry by id.
+     * Throws a descriptive error if the id is not found — never falls back silently.
+     * @param {string} id
+     * @returns {{ file, sx, sy, sw, sh, frames, animated, category }}
+     */
+    getSprite(id) {
+        if (!this._atlasLoaded) {
+            throw new Error(`[SpriteRenderer] Atlas not loaded yet; cannot getSprite("${id}")`);
+        }
+        const entry = this._atlasById.get(id);
+        if (!entry) {
+            throw new Error(`[SpriteRenderer] Missing atlas entry: "${id}"`);
+        }
+        return entry;
     }
 
     /** True once all required core tile sheets are settled (loaded or failed). */
@@ -136,15 +168,20 @@ class SpriteRenderer {
             ['STAIRSUP',    1],
         ];
         for (const [name, count] of STATIC) {
-            for (let v = 0; v < count; v++) this._getCachedVariant(name, v, ts);
+            for (let v = 0; v < count; v++) {
+                try { this._getCachedVariant(name, v, ts); }
+                catch (e) { console.error(e.message); }
+            }
         }
 
-        // animated tiles
+        // animated tiles — frameCount covers both old (.frames.length) and new (.frameCount)
         for (const name of ['WATER', 'DOOR', 'TORCH']) {
             const def = TILE_MANIFEST[name];
-            if (!def?.frames) continue;
-            for (let f = 0; f < def.frames.length; f++) {
-                this._getCachedFrame(name, f, ts);
+            if (!def) continue;
+            const frameCount = def.frameCount ?? def.frames?.length ?? 0;
+            for (let f = 0; f < frameCount; f++) {
+                try { this._getCachedFrame(name, f, ts); }
+                catch (e) { console.error(e.message); }
             }
         }
     }
@@ -169,7 +206,8 @@ class SpriteRenderer {
         const waterInterval = 250;
         while (this._waterAccum >= waterInterval) {
             this._waterAccum -= waterInterval;
-            const frameCount = TILE_MANIFEST.WATER?.frames?.length ?? 4;
+            const wdef = TILE_MANIFEST.WATER;
+            const frameCount = wdef?.frameCount ?? wdef?.frames?.length ?? 4;
             this._waterFrame = (this._waterFrame + 1) % frameCount;
         }
 
@@ -358,6 +396,37 @@ class SpriteRenderer {
     }
 
     /**
+     * Loads all image files referenced by TILE_MANIFEST atlas-ID entries,
+     * marks them as required, and starts their loads.
+     * Called once after sprite_atlas.json finishes fetching.
+     */
+    _loadAtlasSheets() {
+        const files = new Set();
+
+        for (const [name, def] of Object.entries(TILE_MANIFEST)) {
+            if (!def || name === 'CHAR') continue;
+
+            // ids-based tiles
+            for (const id of (def.ids || [])) {
+                const e = this._atlasById.get(id);
+                if (e) files.add(e.file);
+            }
+
+            // animId-based tiles
+            if (def.animId) {
+                const e = this._atlasById.get(def.animId);
+                if (e) files.add(e.file);
+            }
+        }
+
+        // All unique terrain image files are required before isReady()
+        for (const file of files) {
+            this._requiredKeys.add(file);
+            if (!this._images.has(file)) this._startLoad(file, '/' + file);
+        }
+    }
+
+    /**
      * After each load/fail event, test whether every required sheet
      * has settled.  When true, flip _ready and warm the cache.
      */
@@ -370,6 +439,9 @@ class SpriteRenderer {
             if (typeof bgDirty !== 'undefined') bgDirty = true;
             return;
         }
+
+        // Must wait for the atlas JSON before we can check image requirements.
+        if (!this._atlasLoaded) return;
 
         const allSettled = [...this._requiredKeys].every(k => {
             const e = this._images.get(k);
@@ -400,39 +472,102 @@ class SpriteRenderer {
     /**
      * Returns a cached ts×ts canvas for a static-tile variant,
      * or null if the sheet isn't loaded / coords are out of bounds.
+     *
+     * Supports two TILE_MANIFEST formats:
+     *   { ids: ['atlas_id', ...] }  — atlas-based (new)
+     *   { sheet, variants: [{sx,sy,sw,sh}, ...] }  — legacy (backward compat)
+     *
+     * Throws a descriptive error if an atlas id is missing.
      */
     _getCachedVariant(manifestKey, variantIdx, ts) {
         const cacheKey = `${manifestKey}:v${variantIdx}:${ts}`;
         if (this._tileCache.has(cacheKey)) return this._tileCache.get(cacheKey);
 
         const def = TILE_MANIFEST[manifestKey];
-        if (!def?.variants) return null;
+        if (!def) { this._tileCache.set(cacheKey, null); return null; }
 
-        const idx  = Math.min(variantIdx, def.variants.length - 1);
-        const rect = def.variants[idx];
-        if (!rect) return null;
+        let result = null;
 
-        const result = this._cutToCanvas(def.sheet, rect, ts);
-        // Cache even if null so we don't retry the sheet on every frame
+        if (def.ids) {
+            // ── Atlas-based format ────────────────────────────────
+            if (!this._atlasLoaded) {
+                // Atlas not ready yet — don't cache so we retry after load
+                return null;
+            }
+            const id = def.ids[Math.min(variantIdx, def.ids.length - 1)];
+            if (!id) { this._tileCache.set(cacheKey, null); return null; }
+
+            const atlasEntry = this._atlasById.get(id);
+            if (!atlasEntry) {
+                throw new Error(
+                    `[SpriteRenderer] Missing atlas entry: "${id}" (tile: ${manifestKey})`
+                );
+            }
+            const rect = {
+                sx: atlasEntry.sx, sy: atlasEntry.sy,
+                sw: atlasEntry.sw, sh: atlasEntry.sh,
+            };
+            result = this._cutToCanvas(atlasEntry.file, rect, ts);
+
+        } else if (def.variants) {
+            // ── Legacy format ─────────────────────────────────────
+            const idx  = Math.min(variantIdx, def.variants.length - 1);
+            const rect = def.variants[idx];
+            if (!rect) { this._tileCache.set(cacheKey, null); return null; }
+            result = this._cutToCanvas(def.sheet, rect, ts);
+        }
+
+        // Cache even null so we don't retry on every frame
         this._tileCache.set(cacheKey, result);
         return result;
     }
 
     /**
      * Returns a cached ts×ts canvas for one frame of an animated tile.
+     *
+     * Supports two TILE_MANIFEST formats:
+     *   { animId: 'atlas_id', frameCount }  — atlas horizontal strip (new)
+     *   { sheet, frames: [{sx,sy,sw,sh}, ...] }  — legacy explicit rects
+     *
+     * Throws a descriptive error if an atlas animId is missing.
      */
     _getCachedFrame(manifestKey, frameIdx, ts) {
         const cacheKey = `${manifestKey}:f${frameIdx}:${ts}`;
         if (this._tileCache.has(cacheKey)) return this._tileCache.get(cacheKey);
 
         const def = TILE_MANIFEST[manifestKey];
-        if (!def?.frames) return null;
+        if (!def) { this._tileCache.set(cacheKey, null); return null; }
 
-        const idx  = Math.min(frameIdx, def.frames.length - 1);
-        const rect = def.frames[idx];
-        if (!rect) return null;
+        let result = null;
 
-        const result = this._cutToCanvas(def.sheet, rect, ts);
+        if (def.animId) {
+            // ── Atlas-based horizontal strip ──────────────────────
+            if (!this._atlasLoaded) return null;   // retry after load
+
+            const atlasEntry = this._atlasById.get(def.animId);
+            if (!atlasEntry) {
+                throw new Error(
+                    `[SpriteRenderer] Missing atlas entry: "${def.animId}" (tile: ${manifestKey})`
+                );
+            }
+            // Frame N is at sx + N * sw in a horizontal strip
+            const fi   = Math.min(frameIdx, atlasEntry.frames - 1);
+            const rect = {
+                sx: atlasEntry.sx + fi * atlasEntry.sw,
+                sy: atlasEntry.sy,
+                sw: atlasEntry.sw,
+                sh: atlasEntry.sh,
+            };
+            result = this._cutToCanvas(atlasEntry.file, rect, ts);
+
+        } else if (def.frames) {
+            // ── Legacy explicit-rect format ───────────────────────
+            const idx  = Math.min(frameIdx, def.frames.length - 1);
+            const rect = def.frames[idx];
+            if (!rect) { this._tileCache.set(cacheKey, null); return null; }
+            result = this._cutToCanvas(def.sheet, rect, ts);
+        }
+
         this._tileCache.set(cacheKey, result);
         return result;
     }
