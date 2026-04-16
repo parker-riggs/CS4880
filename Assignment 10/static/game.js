@@ -1457,32 +1457,28 @@ function _buildTileCache() {
     }
 
     // ── WATER  8 animation frames (flipbook @ ~12fps ≈ 83ms/frame) ─
-    // 8 frames gives a smoother 664ms cycle vs the previous 4-frame 500ms cycle.
     for (let f = 0; f < 8; f++) {
         const can = _mkTile(), c = can.getContext('2d');
-        // Deep base + dithered depth variation (alternates phase for shimmer)
+        // Solid base — no dither, no per-pixel loops
         c.fillStyle = P.M_SLATE; c.fillRect(0, 0, T, T);
-        dither2(c, 0, Math.floor(T*.50), T, Math.floor(T*.50), P.M_SLATE, P.M_TEAL, f&1);
-        // Mid shimmer band drifts upward across frames
-        const bandY = (Math.floor(T*.28) + f * Math.floor(T*.035)) % T;
-        c.fillStyle = P.L_WATER; c.fillRect(0, bandY, T, Math.floor(T*.18));
-        // 3 primary wave stripes (scroll 1px per frame)
+        // Darker lower third for depth illusion (two solid rects, zero GC)
+        c.fillStyle = P.M_TEAL;
+        c.fillRect(0, Math.floor(T * 0.62), T, Math.floor(T * 0.38));
+        // Shimmer band drifts upward — 1 rect
+        const bandY = (Math.floor(T * 0.32) + f * Math.floor(T * 0.025)) % T;
+        c.fillStyle = P.L_WATER;
+        c.fillRect(0, bandY, T, Math.floor(T * 0.20));
+        // 3 wave stripes — narrow, offset, alternating lightness
         for (let i = 0; i < 3; i++) {
-            const wy = (Math.floor(T*.10 + i*(T/3.2)) + f) % T;
-            c.fillStyle = (i+Math.floor(f/2))%2===0 ? P.L_WATER : P.L_BLUE;
-            c.fillRect(Math.floor(T*.04), wy, Math.floor(T*.92), Math.max(1,Math.floor(T*.04)));
+            const wy = (Math.floor(T * 0.12 + i * (T / 3.4)) + f) % T;
+            c.fillStyle = (i + Math.floor(f / 2)) % 2 === 0 ? P.L_WATER : P.L_BLUE;
+            c.fillRect(Math.floor(T * 0.05), wy, Math.floor(T * 0.88), Math.max(1, Math.floor(T * 0.05)));
         }
-        // Secondary fine ripple layer (faster scroll — 1.5px per frame)
-        for (let i = 0; i < 2; i++) {
-            const wy2 = (Math.floor(i*(T*.48)) + Math.floor(f*1.5)) % T;
-            c.fillStyle = P.L_BLUE;
-            c.fillRect(Math.floor(T*.18), wy2, Math.floor(T*.64), 1);
-        }
-        // Specular glint appears every 4 frames, shifts position
-        if ((f&3)===0) {
+        // Specular glint — every 4 frames, alternate position
+        if ((f & 3) === 0) {
             c.fillStyle = P.L_WHITE;
-            c.fillRect(f===0?Math.floor(T*.14):Math.floor(T*.56), Math.floor(T*.17), 2, 1);
-            c.fillRect(Math.floor(T*.42), Math.floor(T*.43), 1, 1);
+            c.fillRect(f === 0 ? Math.floor(T * 0.14) : Math.floor(T * 0.54), Math.floor(T * 0.18), 2, 1);
+            c.fillRect(Math.floor(T * 0.42), Math.floor(T * 0.43), 1, 1);
         }
         _tc[`wa${f}`] = can;
     }
@@ -1585,6 +1581,21 @@ function drawAnimatedTiles() {
 //  TILE RENDERING
 // ═══════════════════════════════════════════════════════
 function drawTile(tile, px, py, tx, ty) {
+    // ── Sprite-sheet path (SpriteRenderer ready) ──────────────────────────────
+    // When SpriteRenderer has finished loading all required core tile sheets,
+    // delegate entirely to it. It handles every tile type and falls back to the
+    // procedural _tc cache internally if a specific sheet failed to load.
+    if (typeof spriteRenderer !== 'undefined' && spriteRenderer.isReady()) {
+        const mapCtx = {
+            dark:       currentMap.dark,
+            isInterior: !!(currentMap.returnMap),
+            isCeiling:  !!(currentMap.returnMap && ty === 0),
+        };
+        spriteRenderer.drawTile(ctx, tile, px, py, tx, ty, mapCtx);
+        return;
+    }
+
+    // ── Procedural fallback (sprites not yet loaded) ──────────────────────────
     ensureTileCache();
     const dark = currentMap.dark;
     const ipx = Math.floor(px), ipy = Math.floor(py);
@@ -1592,38 +1603,31 @@ function drawTile(tile, px, py, tx, ty) {
     switch (tile) {
         case TILE.GRASS: {
             ctx.drawImage(_tc[`g${(tx*7+ty*13)&7}`], ipx, ipy, S1, S1);
-            // Autotile edge blending: 2-pass progressive dither at grass→path/water borders.
-            // Pass 1 (sw wide, 50% density): hard blend zone at the edge.
-            // Pass 2 (sw2 wide, 25% density): soft halo just beyond, creating a 3-step gradient.
-            const sw  = Math.max(4, Math.floor(TS/8));
-            const sw2 = Math.max(2, Math.floor(sw * .65));
+            // Autotile edge blending: dithered strip at grass→path/water borders
+            const sw = Math.max(4, Math.floor(TS/8));
             const blendNeighbors = [[tx,ty-1,0],[tx,ty+1,1],[tx-1,ty,2],[tx+1,ty,3]];
             for (const [ntx,nty,dir] of blendNeighbors) {
                 const nt = currentMap.tiles[nty]?.[ntx];
                 if (nt!==TILE.PATH && nt!==TILE.WATER) continue;
                 const bCol = nt===TILE.WATER ? PALETTE.M_SLATE : PALETTE.M_CLAY;
-                if (dir===0) { dither2(ctx,ipx,ipy,              TS,sw, PALETTE.M_FOREST,bCol,0); dither4(ctx,ipx,ipy+sw,            TS,sw2,bCol,0); }
-                if (dir===1) { dither2(ctx,ipx,ipy+TS-sw,        TS,sw, PALETTE.M_FOREST,bCol,1); dither4(ctx,ipx,ipy+TS-sw-sw2,     TS,sw2,bCol,1); }
-                if (dir===2) { dither2(ctx,ipx,ipy,              sw,TS, PALETTE.M_FOREST,bCol,0); dither4(ctx,ipx+sw,ipy,            sw2,TS,bCol,0); }
-                if (dir===3) { dither2(ctx,ipx+TS-sw,ipy,        sw,TS, PALETTE.M_FOREST,bCol,1); dither4(ctx,ipx+TS-sw-sw2,ipy,     sw2,TS,bCol,1); }
+                if (dir===0) dither2(ctx, ipx, ipy,           TS, sw, PALETTE.M_FOREST, bCol, 0);
+                if (dir===1) dither2(ctx, ipx, ipy+TS-sw,     TS, sw, PALETTE.M_FOREST, bCol, 1);
+                if (dir===2) dither2(ctx, ipx, ipy,           sw, TS, PALETTE.M_FOREST, bCol, 0);
+                if (dir===3) dither2(ctx, ipx+TS-sw, ipy,     sw, TS, PALETTE.M_FOREST, bCol, 1);
             }
-            // Diagonal corner fill — draws a dither patch at convex corners where two
-            // cardinal blend strips would otherwise leave a bare notch.
-            // Only fires when neither adjacent cardinal is already blended (avoids double draw).
-            const grassDiags = [
-                [tx+1,ty-1, tx,  ty-1, tx+1,ty,   TS-sw, 0     ], // NE
-                [tx+1,ty+1, tx,  ty+1, tx+1,ty,   TS-sw, TS-sw ], // SE
-                [tx-1,ty+1, tx,  ty+1, tx-1,ty,   0,     TS-sw ], // SW
-                [tx-1,ty-1, tx,  ty-1, tx-1,ty,   0,     0     ], // NW
-            ];
-            for (const [dnx,dny,a1x,a1y,a2x,a2y,cpx,cpy] of grassDiags) {
-                const dt  = currentMap.tiles[dny ]?.[dnx];
+            // Diagonal corner fills — inline (no array allocs), fills the bare notch at
+            // convex corners where two cardinal blend strips would otherwise hard-cut.
+            for (let ci = 0; ci < 4; ci++) {
+                const dnx = ci < 2 ? tx+1 : tx-1;
+                const dny = (ci===0||ci===2) ? ty-1 : ty+1;
+                const dt  = currentMap.tiles[dny]?.[dnx];
                 if (dt!==TILE.PATH && dt!==TILE.WATER) continue;
-                const a1t = currentMap.tiles[a1y]?.[a1x];
-                const a2t = currentMap.tiles[a2y]?.[a2x];
+                // Skip if either adjacent cardinal already handles this corner
+                const a1t = currentMap.tiles[dny]?.[tx];   // N or S of current
+                const a2t = currentMap.tiles[ty ]?.[dnx];  // E or W of current
                 if ((a1t===TILE.PATH||a1t===TILE.WATER)||(a2t===TILE.PATH||a2t===TILE.WATER)) continue;
                 const bCol = dt===TILE.WATER ? PALETTE.M_SLATE : PALETTE.M_CLAY;
-                dither2(ctx, ipx+cpx, ipy+cpy, sw, sw, PALETTE.M_FOREST, bCol, 0);
+                dither2(ctx, ipx+(dnx>tx?TS-sw:0), ipy+(dny>ty?TS-sw:0), sw, sw, PALETTE.M_FOREST, bCol, 0);
             }
             break;
         }
@@ -3882,6 +3886,12 @@ function loop(ts) {
     // JUST_PRESSED would never be cleared — clearing here prevents a key
     // press from being held over into a later frame and firing twice.
     JUST_PRESSED.clear();
+
+    // Advance SpriteRenderer animations (water, torch) with the raw frame delta.
+    // rawDt is capped at 50 ms above — safe to pass directly.
+    if (typeof spriteRenderer !== 'undefined') {
+        spriteRenderer.advanceAnimations(Math.min(rawDt, 50));
+    }
 
     render();
     requestAnimationFrame(loop);
