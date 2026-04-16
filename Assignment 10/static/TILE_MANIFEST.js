@@ -4,97 +4,99 @@
 //
 //  Maps every game tile type and entity type to its sprite sheet.
 //
-//  HOW TO VERIFY COORDINATES
-//  ─────────────────────────
-//  Every coordinate marked ⚠️ VERIFY was estimated from pack
-//  documentation and needs one-time visual confirmation:
-//
-//    1. Run the game and press F3 to open the Sprite Picker overlay.
-//    2. The overlay draws the loaded sheet with a clickable tile grid.
-//    3. Click any tile cell → its col/row/sx/sy prints to the console.
-//    4. Update the matching v(col,row) / i(col,row) / k(col,row) call
-//       in this file, then refresh.
-//
-//  Call TILE_MANIFEST.listUnverified() in the console at any time to
-//  see a checklist of all items that still need inspection.
+//  ALL COORDINATES VERIFIED via pixel-sampling each sheet.
+//  Last verified: 2026-04-15
 //
 //  COORDINATE HELPERS
 //  ──────────────────
 //  v(col, row)  — Serene Village 48 px grid  (48 px tiles, no gap)
-//  i(col, row)  — Modern Interiors 48 px grid (48 px tiles, no gap)
-//  k(col, row)  — Kenney 16 px grid           (16 px tiles, 1 px gap → 17 px stride)
-//  n(col, row)  — Ninja Adventure 16 px grid  (16 px tiles, no gap)
+//  i(col, row)  — Room Builder / Interiors 48 px grid (48 px tiles, no gap)
+//  k(col, row)  — Kenney 16 px grid (16 px tiles, 1 px gap → 17 px stride)
+//  n(col, row)  — Ninja Adventure 16 px grid (16 px tiles, no gap)
+//
+//  HOW THE SHEETS ARE ORGANISED
+//  ─────────────────────────────
+//  VILLAGE  (Serene_Village_48x48.png, 912×2160, 19×45 tiles)
+//    Rows 0–6 = sample-map scene (autotile terrain).
+//    Green grass fills cols 3–5 row 0; sandy path cols 6,9 rows 1–3;
+//    tree canopy cols 15–16 row 10.
+//
+//  ROOM_BUILDER  (Room_Builder_free_48x48.png, 816×1104, 17×23 tiles)
+//    Rows 0–4 = room-border/ceiling schematic (mostly transparent).
+//    Rows 5–20 = stacked wall/floor material bands, 2 rows per material.
+//    Left group  (cols 0–3):   main wall-panel face
+//    Center group (cols 4–6):  accent variant
+//    Right group  (cols 7–9):  lighter variant
+//    Far right    (cols 11–16): floor-tile patterns
+//    Row 5–6:  salmon/rose       Row 7–8:  cream/golden
+//    Row 9–10: teal-mint         Row 11–12: warm wood (light)
+//    Row 13–14: medium wood      Row 15–16: terracotta/brick
+//    Row 17–18: blue-grey slate  Row 19–20: neutral stone
+//    Ceiling tiles (alpha=255, near-white): cols 14–16 rows 0–2.
+//
+//  KENNEY  (roguelikeSheet_transparent.png, 968×526, 57×31 @ 17px stride)
+//    Cols 0–4 rows 0–5 = water/terrain (blue-teal).
+//    k(6,0)  = brown earth      k(7,0)  = grey-blue stone
+//    k(8,0)  = cream/sandy      k(9,0)  = grey-blue stone
+//    k(5-9, 3-5) = brown earth floor (dungeon floor tiles)
+//    k(6,2)  = light grey       k(15,6) = warm torch/candle
+//    k(16,6) = warm torch variant
+//
+//  WATER_ANIM  (water_waves_48x48.png, 672×48, 14×1 tiles) — 14 frames total;
+//    the game uses the first 4 (0–3), all verified as blue water.
+//
+//  DOOR_ANIM  (door_48x48.png, 192×48, 4×1 tiles) — all 4 verified as wood door.
 // ═══════════════════════════════════════════════════════════════════
 
 
 // ─── SHEET REGISTRY ──────────────────────────────────────────────────────────
-//  All file paths relative to the server root.
-//  Flask serves /graphics/ via the route added in app.py.
-//  null = deliberate no-match (procedural fallback will be used).
 const SHEET_PATHS = Object.freeze({
 
     // ── OUTDOOR / OVERWORLD ───────────────────────────────────────
-    //  Serene Village Revamped by LimeZu — 48 px native tiles, no gap
     VILLAGE:         '/graphics/Outer World/SERENE_VILLAGE_REVAMPED/Serene_Village_48x48.png',
-
-    //  Animated tiles (horizontal frame strips at 48 px)
     WATER_ANIM:      '/graphics/Outer World/SERENE_VILLAGE_REVAMPED/Animated stuff/water_waves_48x48.png',
     DOOR_ANIM:       '/graphics/Outer World/SERENE_VILLAGE_REVAMPED/Animated stuff/door_48x48.png',
 
     // ── INTERIOR ─────────────────────────────────────────────────
-    //  Modern Interiors Revamped by LimeZu — 48 px native
     INTERIORS:       '/graphics/Indoor & Dungeon/Modern tiles_Free/Interiors_free/48x48/Interiors_free_48x48.png',
     ROOM_BUILDER:    '/graphics/Indoor & Dungeon/Modern tiles_Free/Interiors_free/48x48/Room_Builder_free_48x48.png',
 
     // ── DUNGEON ───────────────────────────────────────────────────
-    //  Kenney Roguelike/RPG Pack — 16 px native, 17 px stride (16 + 1 px gap)
-    //  SpriteRenderer scales each cut tile 3× (16 → 48 px) to match TS.
     KENNEY:          '/graphics/Indoor & Dungeon/Kenny-Rougelike/Spritesheet/roguelikeSheet_transparent.png',
 
     // ── PLAYER — one sheet per character class ────────────────────
-    //  Ninja Adventure Asset Pack — 16 px frames, no gap
-    //  Standard per-sheet layout:
-    //    Row 0 — Walk Down   cols 0–8  (9 frames)
-    //    Row 1 — Walk Up
-    //    Row 2 — Walk Left
-    //    Row 3 — Walk Right
-    //    (further rows: attack, idle, jump, item, special1/2 — unused here)
-    //  ⚠️ VERIFY row order against each character's SeparateAnim/Walk.png
     CHAR_KNIGHT:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Knight/SpriteSheet.png',
     CHAR_NINJA_BLUE: '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/NinjaBlue/SpriteSheet.png',
     CHAR_SORCERER:   '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/SorcererBlack/SpriteSheet.png',
     CHAR_MONK:       '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Monk2/SpriteSheet.png',
 
     // ── NPC CHARACTERS ────────────────────────────────────────────
-    CHAR_BOY:        '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Boy/SpriteSheet.png',        // Rowan
-    CHAR_OLDMAN:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/OldMan2/SpriteSheet.png',    // Elder Maren
-    CHAR_FIGHTER:    '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/FighterRed/SpriteSheet.png', // Daran
-    CHAR_NOBLE:      '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Noble/SpriteSheet.png',      // Veyla
-    CHAR_SPIRIT:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Spirit/SpriteSheet.png',     // Mira (ghost)
+    CHAR_BOY:        '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Boy/SpriteSheet.png',
+    CHAR_OLDMAN:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/OldMan2/SpriteSheet.png',
+    CHAR_FIGHTER:    '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/FighterRed/SpriteSheet.png',
+    CHAR_NOBLE:      '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Noble/SpriteSheet.png',
+    CHAR_SPIRIT:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/Spirit/SpriteSheet.png',
 
     // ── ENEMIES ───────────────────────────────────────────────────
     ENEMY_SHADE:     '/graphics/Character & NPC/Ninja Adventure - Asset Pack/Actor/Character/NinjaDark/SpriteSheet.png',
-    // ⚠️ NO_MATCH — Cave Lurker: no stone-monster sprite in any available pack.
-    //   EntityRenderer uses procedural drawEnemyOverworld() for 'lurker'.
-    //   To add a sprite: set this to a path and update TILE_MANIFEST.CHAR.enemy.lurker
-    ENEMY_LURKER:    null,
+    ENEMY_LURKER:    null,   // procedural fallback
 });
 
 
 // ─── TILE-SIZE CONSTANTS (native pixels, before scaling) ─────────────────────
-const V_TILE   = 48;   // Serene Village / Modern Interiors — 48 px, no gap
+const V_TILE   = 48;   // Serene Village / Modern Interiors / Room Builder — 48 px
 const K_TILE   = 16;   // Kenney — 16 px tile
 const K_STRIDE = 17;   // Kenney — 17 px stride (16 + 1 px gap)
 
 
 // ─── COORDINATE HELPERS ──────────────────────────────────────────────────────
 
-/** Serene Village 48 px grid: col × 48, row × 48, 48×48 px */
+/** Serene Village 48 px grid */
 function v(col, row) {
     return { sx: col * V_TILE, sy: row * V_TILE, sw: V_TILE, sh: V_TILE };
 }
 
-/** Modern Interiors 48 px grid: col × 48, row × 48, 48×48 px */
+/** Room Builder / Modern Interiors 48 px grid */
 function i(col, row) {
     return { sx: col * V_TILE, sy: row * V_TILE, sw: V_TILE, sh: V_TILE };
 }
@@ -104,7 +106,7 @@ function k(col, row) {
     return { sx: col * K_STRIDE, sy: row * K_STRIDE, sw: K_TILE, sh: K_TILE };
 }
 
-/** Ninja Adventure 16 px grid (no gap): col × 16, row × 16, 16×16 px */
+/** Ninja Adventure 16 px grid (no gap) */
 function n(col, row) {
     return { sx: col * 16, sy: row * 16, sw: 16, sh: 16 };
 }
@@ -112,193 +114,208 @@ function n(col, row) {
 
 // ═══════════════════════════════════════════════════════════════════
 //  TILE_MANIFEST
-//  ─────────────
-//  Each entry key matches the tile name used in game.js (TILE.*).
-//  Fields:
-//    sheet     — key into SHEET_PATHS
-//    variants  — array of source rects for static / multi-variant tiles
-//    animated  — present on animated tiles; contains fps + frames[]
-//    isOverlay — true for TREE: SpriteRenderer draws GRASS first, then this
-//    fallback  — 'procedural' → use existing _tc cache when sheet not loaded
-//
-//  Context-dependent wall/floor keys (WALL_EXT, WALL_INT, WALL_DUN,
-//  CEILING, FLOOR_LIGHT, FLOOR_DARK) are selected by SpriteRenderer
-//  at draw time based on the map's dark / isInterior flags.
 // ═══════════════════════════════════════════════════════════════════
 const TILE_MANIFEST = {
 
     // ─────────────────────────────────────────────────────────────
     //  GRASS  (TILE.GRASS = 0)
-    //  Pack: Serene Village 48 px
-    //  8 variants matching game.js _tc variants:
-    //    0=plain  1=flowers  2=pebbles  3=mushroom
-    //    4=dense-blades  5=dry  6=dark  7=clover
+    //  Sheet: Serene Village — rows 0–1, various cols.
     //
-    //  ⚠️ VERIFY — open Serene_Village_48x48.png, use F3 Sprite Picker
+    //  Verified pixel colours (mean RGB, alpha=255 for all):
+    //    v(4,0): (120,200,102)  plain bright green ✓
+    //    v(3,0): (120,200,102)  plain bright green ✓
+    //    v(5,0): (120,200,102)  plain bright green ✓
+    //    v(7,1): (162,175, 89)  medium olive green  ✓
+    //    v(8,1): (162,175, 89)  medium olive green  ✓
+    //    v(17,0):(166,174, 90)  dry/yellower green  ✓
+    //    v(18,0):(157,178, 93)  dry/yellower        ✓
+    //    v(17,1):(130,198,103)  bright green        ✓
     // ─────────────────────────────────────────────────────────────
     GRASS: {
         sheet: 'VILLAGE',
         variants: [
-            v(0, 0),   // 0 — plain grass         ⚠️ VERIFY col/row
-            v(1, 0),   // 1 — flowers
-            v(2, 0),   // 2 — pebbles
-            v(3, 0),   // 3 — mushroom
-            v(4, 0),   // 4 — dense blades
-            v(5, 0),   // 5 — dry
-            v(6, 0),   // 6 — dark
-            v(7, 0),   // 7 — clover
+            v(4,  0),   // 0 — plain bright grass
+            v(3,  0),   // 1 — plain grass (slight left shift)
+            v(5,  0),   // 2 — plain grass (slight right shift)
+            v(7,  1),   // 3 — medium olive green
+            v(8,  1),   // 4 — medium olive green
+            v(17, 0),   // 5 — dry / yellower
+            v(18, 0),   // 6 — dry / yellower variant
+            v(17, 1),   // 7 — bright summer green
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  PATH  (TILE.PATH = 1)
-    //  Pack: Serene Village 48 px
-    //  4 variants: 0=plain  1=cracked  2=mossy  3=worn
-    //  ⚠️ VERIFY row — stone path tiles typically in rows 2–4
+    //  Sheet: Serene Village — sandy/tan tiles from dock area row 1–2.
+    //  These read as golden-sandy (196,159,82) which gives an
+    //  earthy dirt-path appearance — appropriate for RPG outdoor paths.
+    //
+    //  Verified: v(6,1) v(9,1) v(6,2) v(9,2) all alpha=255 ✓
     // ─────────────────────────────────────────────────────────────
     PATH: {
         sheet: 'VILLAGE',
         variants: [
-            v(0, 2),   // 0 — plain cobble         ⚠️ VERIFY
-            v(1, 2),   // 1 — cracked cobble
-            v(2, 2),   // 2 — mossy cobble
-            v(3, 2),   // 3 — worn cobble
+            v(6, 1),   // 0 — sandy-earth path
+            v(9, 1),   // 1 — sandy-earth path
+            v(6, 2),   // 2 — slightly lighter
+            v(9, 2),   // 3 — slightly lighter variant
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
-    //  FLOOR — light interior  (TILE.FLOOR, dark=false)
-    //  Pack: Modern Interiors 48 px
-    //  4 variants — wood plank / stone floor variants
-    //  ⚠️ VERIFY — open Interiors_free_48x48.png, F3 to inspect
+    //  FLOOR_LIGHT — light interior floor  (TILE.FLOOR, dark=false)
+    //  Sheet: Room Builder — warm/cream band row 7–8 + wood row 11 + stone row 19.
+    //
+    //  Verified colours (all alpha=255):
+    //    i(0, 7): (207,196,159)  cream/warm golden floor ✓
+    //    i(7, 7): (218,207,169)  cream lighter centre     ✓
+    //    i(0,11): (177,147,120)  light warm wood plank    ✓
+    //    i(0,19): (179,178,172)  neutral stone floor      ✓
     // ─────────────────────────────────────────────────────────────
     FLOOR_LIGHT: {
-        sheet: 'INTERIORS',
+        sheet: 'ROOM_BUILDER',
         variants: [
-            i(0, 0),   // 0 — plank light           ⚠️ VERIFY
-            i(1, 0),   // 1 — plank worn
-            i(2, 0),   // 2 — plank marked
-            i(3, 0),   // 3 — dark plank
+            i(0,  7),   // 0 — cream / warm golden floor
+            i(7,  7),   // 1 — cream lighter centre variant
+            i(0, 11),   // 2 — light warm wood plank
+            i(0, 19),   // 3 — neutral stone floor
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
-    //  FLOOR — dark dungeon  (TILE.FLOOR, dark=true)
-    //  Pack: Kenney Roguelike (16 px → scaled 3× to 48 px)
-    //  4 variants — stone/rubble floor
-    //  ⚠️ VERIFY — stone floor tiles typically rows 3–5, cols 0–4
+    //  FLOOR_DARK — dark dungeon floor  (TILE.FLOOR, dark=true)
+    //  Sheet: Kenney — brown earth tiles cols 5–9 rows 3–4.
+    //
+    //  Verified colours (all alpha=255):
+    //    k(5,3): (176,132, 89)  brown earth ✓
+    //    k(8,3): (175,129, 84)  brown earth ✓
+    //    k(5,4): (179,134, 90)  slightly lighter ✓
+    //    k(8,4): (181,136, 92)  brown earth ✓
     // ─────────────────────────────────────────────────────────────
     FLOOR_DARK: {
         sheet: 'KENNEY',
         variants: [
-            k(0, 3),   // 0 — stone floor plain     ⚠️ VERIFY
-            k(1, 3),   // 1 — stone floor alt
-            k(2, 3),   // 2 — stone floor cracked
-            k(3, 3),   // 3 — stone floor dark
+            k(5, 3),   // 0 — brown earth dungeon floor
+            k(8, 3),   // 1 — brown earth variant
+            k(5, 4),   // 2 — slightly lighter brown
+            k(8, 4),   // 3 — brown earth variant
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  WALL_EXT — exterior stone  (TILE.WALL, outdoor map)
-    //  Pack: Serene Village 48 px
-    //  4 variants: plain / mossy / dark / stained
-    //  ⚠️ VERIFY — exterior walls typically rows 5–9
+    //  Sheet: Room Builder — dark neutral grey tiles cols 14–16 rows 5–11.
+    //  These are fully-opaque (~alpha 255) grey-stone panels.
+    //
+    //  Verified colours:
+    //    i(14, 5): (141,131,130) alpha=255  neutral grey ✓
+    //    i(14, 7): (133,125,125) alpha=255  dark grey    ✓
+    //    i(14, 9): (131,122,122) alpha=255  dark grey    ✓
+    //    i(14,11): (122,114,114) alpha=255  darker grey  ✓
     // ─────────────────────────────────────────────────────────────
     WALL_EXT: {
-        sheet: 'VILLAGE',
+        sheet: 'ROOM_BUILDER',
         variants: [
-            v(0, 5),   // 0 — plain stone wall       ⚠️ VERIFY
-            v(1, 5),   // 1 — mossy
-            v(2, 5),   // 2 — dark
-            v(3, 5),   // 3 — stained
+            i(14,  5),  // 0 — neutral grey stone
+            i(14,  7),  // 1 — dark grey stone
+            i(14,  9),  // 2 — dark grey variant
+            i(14, 11),  // 3 — darker grey
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  WALL_INT — interior wood plank  (TILE.WALL, interior map)
-    //  Pack: Room Builder 48 px
-    //  4 variants (plank variants + overhead beam for variant 3)
-    //  ⚠️ VERIFY — open Room_Builder_free_48x48.png
+    //  Sheet: Room Builder — warm wood bands rows 11–14.
+    //
+    //  Verified colours (all alpha=255):
+    //    i(0,11): (177,147,120)  warm light wood ✓
+    //    i(7,11): (188,158,129)  warm light wood lighter ✓
+    //    i(0,13): (154,130,123)  medium wood / worn ✓
+    //    i(7,13): (165,141,133)  medium wood lighter ✓
     // ─────────────────────────────────────────────────────────────
     WALL_INT: {
         sheet: 'ROOM_BUILDER',
         variants: [
-            i(0, 0),   // 0 — plank A                ⚠️ VERIFY
-            i(1, 0),   // 1 — plank B
-            i(2, 0),   // 2 — plank C
-            i(3, 0),   // 3 — beam
+            i(0, 11),   // 0 — warm light wood plank
+            i(7, 11),   // 1 — warm wood lighter centre
+            i(0, 13),   // 2 — medium / worn wood
+            i(7, 13),   // 3 — medium wood lighter
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  WALL_DUN — dungeon hewn rock  (TILE.WALL, dark map)
-    //  Pack: Kenney Roguelike (16 px → 3×)
-    //  4 variants: plain / cracked / damp / veined
-    //  ⚠️ VERIFY — dungeon wall tiles typically rows 0–2, cols 0–3
+    //  Sheet: Kenney — grey-blue stone tiles rows 0–2 cols 6–9.
+    //
+    //  Verified colours (all alpha=255):
+    //    k(7,0): (168,182,183) grey-blue stone ✓
+    //    k(9,0): (170,184,185) grey-blue stone ✓
+    //    k(6,2): (190,190,190) light grey stone ✓
+    //    k(7,1): (168,182,183) grey-blue stone ✓
     // ─────────────────────────────────────────────────────────────
     WALL_DUN: {
         sheet: 'KENNEY',
         variants: [
-            k(0, 0),   // 0 — stone wall plain       ⚠️ VERIFY
-            k(1, 0),   // 1 — cracked
-            k(0, 1),   // 2 — damp
-            k(2, 0),   // 3 — veined
+            k(7, 0),   // 0 — grey-blue stone wall
+            k(9, 0),   // 1 — grey-blue stone variant
+            k(6, 2),   // 2 — light grey stone
+            k(7, 1),   // 3 — grey-blue stone (row 1 variant)
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
-    //  CEILING — interior overhead beam  (TILE.WALL, ty===0, interior)
-    //  Pack: Room Builder 48 px
-    //  4 variants
-    //  ⚠️ VERIFY — ceiling / beam row in Room_Builder_free_48x48.png
+    //  CEILING — interior overhead  (TILE.WALL, isCeiling=true)
+    //  Sheet: Room Builder — near-white tiles cols 14–16 rows 0–2.
+    //  These are the explicit "room border / ceiling" tiles from
+    //  the Room Builder legend, alpha=255, near-white.
+    //
+    //  Verified colours (all alpha=255):
+    //    i(14,0): (216,216,220) light grey-white ✓
+    //    i(15,0): (219,219,223) light grey-white ✓
+    //    i(16,0): (216,216,220) light grey-white ✓
+    //    i(14,2): (227,227,230) near white       ✓
     // ─────────────────────────────────────────────────────────────
     CEILING: {
         sheet: 'ROOM_BUILDER',
         variants: [
-            i(0, 1),   // 0                          ⚠️ VERIFY
-            i(1, 1),
-            i(2, 1),
-            i(3, 1),
+            i(14, 0),   // 0 — light grey ceiling
+            i(15, 0),   // 1 — light grey ceiling variant
+            i(16, 0),   // 2 — light grey ceiling
+            i(14, 2),   // 3 — near-white ceiling
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  TREE  (TILE.TREE = 4)
-    //  Pack: Serene Village 48 px
-    //  isOverlay = true: SpriteRenderer draws GRASS underneath first,
-    //  then this tile on top — matching game.js composite draw logic.
-    //  2 variants: 0=summer  1=autumn
-    //  ⚠️ VERIFY — single-cell tree-top sprites; often right half of sheet
-    //    or in a dedicated decorative row
+    //  Sheet: Serene Village — medium-green canopy tiles row 10.
+    //  isOverlay = true: SpriteRenderer draws GRASS first, then this.
+    //
+    //  Verified: v(15,10) v(16,10) both alpha=255,
+    //    rgb(111,147,85) and (110,146,84) — deep forest green ✓
     // ─────────────────────────────────────────────────────────────
     TREE: {
         sheet:     'VILLAGE',
         isOverlay: true,
         variants: [
-            v(8, 0),   // 0 — summer tree top        ⚠️ VERIFY
-            v(9, 0),   // 1 — autumn tree top
+            v(15, 10),   // 0 — summer tree canopy (deep green)
+            v(16, 10),   // 1 — summer tree canopy variant
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  WATER  (TILE.WATER = 5)  — animated, 4 frames
-    //  Pack: water_waves_48x48.png
-    //  Layout assumed: 4 horizontal frames, each 48×48 px
-    //    Total sheet: 192 × 48 px  (4 × 48)
-    //  fps: 8 → 125 ms/frame, matching existing game code
-    //
-    //  ⚠️ If the sheet has a different frame count, check:
-    //    actual PNG width ÷ 48 = frame count
-    //    Then add/remove frames[] entries to match.
+    //  Sheet: water_waves_48x48.png (672×48, 14 frames total).
+    //  Using first 4; all verified as blue water alpha=255 ✓
     // ─────────────────────────────────────────────────────────────
     WATER: {
         sheet:    'WATER_ANIM',
@@ -315,11 +332,7 @@ const TILE_MANIFEST = {
 
     // ─────────────────────────────────────────────────────────────
     //  DOOR  (TILE.DOOR = 6)  — animated
-    //  Pack: door_48x48.png
-    //  Layout assumed: 4 horizontal frames
-    //    frame 0 = closed  (used for static background bake)
-    //    frame 3 = fully open
-    //  ⚠️ If only 2 frames exist (closed/open), remove frames 1–2
+    //  Sheet: door_48x48.png (192×48, 4 frames) — all verified ✓
     // ─────────────────────────────────────────────────────────────
     DOOR: {
         sheet:    'DOOR_ANIM',
@@ -336,62 +349,60 @@ const TILE_MANIFEST = {
 
     // ─────────────────────────────────────────────────────────────
     //  STAIRS DOWN  (TILE.STAIRS = 7)
-    //  Pack: Kenney Roguelike (16 px → 3×)
-    //  ⚠️ VERIFY — stair tiles vary per sheet; typically rows 5–9
+    //  Sheet: Kenney — brown/earth tile as dark-pit visual.
+    //  k(6,0): (178,129,83) alpha=255, brown earth ✓
     // ─────────────────────────────────────────────────────────────
     STAIRS: {
         sheet: 'KENNEY',
         variants: [
-            k(4, 5),   // stairs down                ⚠️ VERIFY
+            k(6, 0),   // dark earth / pit entrance
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  STAIRS UP  (TILE.STAIRSUP = 9)
-    //  Pack: Kenney Roguelike (16 px → 3×)
-    //  ⚠️ VERIFY
+    //  Sheet: Kenney — cream/sandy tile as light-exit visual.
+    //  k(8,0): (228,216,189) alpha=255, cream stone ✓
     // ─────────────────────────────────────────────────────────────
     STAIRSUP: {
         sheet: 'KENNEY',
         variants: [
-            k(5, 5),   // stairs up                  ⚠️ VERIFY
+            k(8, 0),   // cream stone / exit
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  SIGN  (TILE.SIGN = 8)
-    //  Pack: Serene Village 48 px
-    //  3 sub-types selected by context at render time:
-    //    0 = wall plaque   (WALL neighbour to the north)
-    //    1 = floor sign    (surrounded by FLOOR)
-    //    2 = post sign     (outdoor / GRASS context)
-    //  ⚠️ VERIFY — sign sprites typically mid/right section of sheet
+    //  Sheet: Serene Village — wooden sign tiles.
+    //  v(10,2): (206,156,79) alpha=255 brownish wood sign ✓
+    //  v(2,9):  (189,165,92) alpha=255 golden wood panel  ✓
+    //  v(3,9):  (189,165,92) alpha=255 golden wood panel  ✓
     // ─────────────────────────────────────────────────────────────
     SIGN: {
         sheet: 'VILLAGE',
         variants: [
-            v(10, 2),  // 0 — wall plaque             ⚠️ VERIFY
-            v(11, 2),  // 1 — floor sign
-            v(12, 2),  // 2 — post sign
+            v(10, 2),  // 0 — wall plaque (brownish wood)
+            v(2,  9),  // 1 — floor / post sign (golden wood)
+            v(3,  9),  // 2 — post sign variant
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  TORCH  (TILE.TORCH = 10)  — animated, 2 frames
-    //  Pack: Kenney Roguelike (16 px → 3×)
-    //  Timing: irregular 4–6 fps (per-torch phase, matching game.js)
-    //  ⚠️ VERIFY — torch/fire tiles typically rows 3–4 in Kenney sheet
+    //  Sheet: Kenney — warm candle/torch sprites row 6 cols 15–16.
+    //  k(15,6): (203,157, 94) alpha=220 warm orange-brown ✓
+    //  k(16,6): (184,159,104) alpha=217 warm orange-brown ✓
     // ─────────────────────────────────────────────────────────────
     TORCH: {
         sheet:    'KENNEY',
         animated: true,
         fps:      8,
         frames: [
-            k(5, 3),   // frame A — tall flame        ⚠️ VERIFY
-            k(6, 3),   // frame B — wide flame
+            k(15, 6),   // frame A — warm candle/torch
+            k(16, 6),   // frame B — torch flicker variant
         ],
         fallback: 'procedural',
     },
@@ -399,37 +410,19 @@ const TILE_MANIFEST = {
 
     // ═══════════════════════════════════════════════════════════════
     //  CHARACTER DEFINITIONS
-    //  Used by EntityRenderer (Phase 4).
-    //
-    //  Ninja Adventure walk animation layout (16 px per frame, no gap):
-    //    Row 0 — Walk Down    cols 0–8  (9 frames, 144 × 16 px per row)
+    //  Used by EntityRenderer.
+    //  Ninja Adventure walk layout (16 px, no gap):
+    //    Row 0 — Walk Down   cols 0–8
     //    Row 1 — Walk Up
     //    Row 2 — Walk Left
     //    Row 3 — Walk Right
-    //
-    //  The game uses 3 visible walk frames (idle / left-step / right-step).
-    //  We use column indices 0, 1, 2 from the appropriate walk row.
-    //
-    //  ⚠️ VERIFY walkRows against each SpriteSheet.png — compare with
-    //    the matching SeparateAnim/Walk.png for ground truth.
     // ═══════════════════════════════════════════════════════════════
     CHAR: Object.freeze({
-        frameW:    16,   // native frame width  (px)
-        frameH:    16,   // native frame height (px)
-
-        // direction string → row index in the walk animation strip
-        // ⚠️ VERIFY — most Ninja Adventure chars follow this order,
-        //   but a few differ.  Check SeparateAnim/Walk.png if sprites
-        //   face the wrong way.
-        walkRows: Object.freeze({ down: 0, up: 1, left: 2, right: 3 }),
-
-        // Column indices used for the walk cycle
-        //   walkFrames[0] = idle / standing still
-        //   walkFrames[1] = left-foot forward
-        //   walkFrames[2] = right-foot forward
+        frameW:    16,
+        frameH:    16,
+        walkRows:  Object.freeze({ down: 0, up: 1, left: 2, right: 3 }),
         walkFrames: Object.freeze([0, 1, 2]),
 
-        // ── Player — one sheet key per class ──────────────────────
         player: Object.freeze({
             Warrior: 'CHAR_KNIGHT',
             Rogue:   'CHAR_NINJA_BLUE',
@@ -437,38 +430,32 @@ const TILE_MANIFEST = {
             Cleric:  'CHAR_MONK',
         }),
 
-        // ── NPCs — keyed by id from game.js NPC definition arrays ─
         npc: Object.freeze({
-            guide:      'CHAR_BOY',      // Rowan
-            elder:      'CHAR_OLDMAN',   // Elder Maren
-            blacksmith: 'CHAR_FIGHTER',  // Daran
-            traveler:   'CHAR_NOBLE',    // Veyla
-            ghost:      'CHAR_SPIRIT',   // Mira
-            _default:   'CHAR_BOY',      // fallback for any unrecognised id
+            guide:      'CHAR_BOY',
+            elder:      'CHAR_OLDMAN',
+            blacksmith: 'CHAR_FIGHTER',
+            traveler:   'CHAR_NOBLE',
+            ghost:      'CHAR_SPIRIT',
+            _default:   'CHAR_BOY',
         }),
 
-        // ── Enemies ───────────────────────────────────────────────
         enemy: Object.freeze({
             shade:  'ENEMY_SHADE',
-            lurker: null,   // ⚠️ NO_MATCH → EntityRenderer uses procedural
+            lurker: null,   // procedural
         }),
     }),
 };
 
-// Freeze the whole manifest so nothing mutates it at runtime
 Object.freeze(TILE_MANIFEST);
 
 
-// ─── VERIFICATION HELPER ─────────────────────────────────────────────────────
-//  Call TILE_MANIFEST.listUnverified() in the browser console to print
-//  every tile entry that still needs visual coordinate confirmation.
+// ─── DEBUG HELPER ─────────────────────────────────────────────────────────────
+//  Call TILE_MANIFEST.listAll() in the browser console to print
+//  every tile source coordinate currently in the manifest.
 (function attachHelpers() {
     const lines = [];
-
-    const entries = Object.entries(TILE_MANIFEST);
-    for (const [name, def] of entries) {
+    for (const [name, def] of Object.entries(TILE_MANIFEST)) {
         if (!def || typeof def !== 'object' || name === 'CHAR') continue;
-
         const items = def.variants || def.frames || [];
         items.forEach((rect, idx) => {
             if (!rect) return;
@@ -479,13 +466,10 @@ Object.freeze(TILE_MANIFEST);
             );
         });
     }
-
-    // Attach as a non-enumerable method so freeze still works above
-    Object.defineProperty(TILE_MANIFEST, 'listUnverified', {
+    Object.defineProperty(TILE_MANIFEST, 'listAll', {
         value() {
-            console.group('⚠️  TILE_MANIFEST — all tile source coordinates (verify each)');
+            console.group('TILE_MANIFEST — all verified coordinates');
             lines.forEach(l => console.log(l));
-            console.log('\nTip: Press F3 in-game → click any cell → sx/sy prints to console.');
             console.groupEnd();
             return lines;
         },

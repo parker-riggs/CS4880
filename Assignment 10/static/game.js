@@ -884,6 +884,10 @@ function resizeCanvas() {
     TS = Math.max(32, Math.min(TS, 64));
     lightCanvas = null; // force recreation at new size
     invalidateTileCache(); // rebuild tile variants at new TS
+    if (typeof spriteRenderer !== 'undefined') {
+        spriteRenderer.invalidate();           // discard stale tile canvases cut at old TS
+        if (spriteRenderer.isReady()) spriteRenderer.warmCache(TS); // rebuild at new TS immediately
+    }
     if (typeof VQ !== 'undefined') VQ.invalidate(); // rebuild sway frames at new TS
     _invalidateVigGrd(); // vignette gradient is sized to cW/cH — must rebuild
 }

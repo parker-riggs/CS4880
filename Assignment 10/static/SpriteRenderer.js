@@ -43,6 +43,10 @@
 //  Call TILE_MANIFEST.listUnverified() for the full coordinate checklist.
 // ═══════════════════════════════════════════════════════════════════
 
+// Set true during development to highlight tiles that fell through to procedural.
+// Red border + tile-ID number will appear over every unmapped/transparent tile.
+const DEBUG_TILES = false;
+
 class SpriteRenderer {
 
     constructor() {
@@ -309,6 +313,22 @@ class SpriteRenderer {
                 break;
         }
 
+        // ── Debug overlay ─────────────────────────────────────────
+        // When DEBUG_TILES is true, flag every tile that missed the sprite path
+        // (sheet loaded but coords returned transparent, or tileId not covered).
+        if (DEBUG_TILES) {
+            ctx.save();
+            ctx.fillStyle   = 'rgba(255,0,0,0.30)';
+            ctx.fillRect(ipx, ipy, ts + 1, ts + 1);
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth   = 2;
+            ctx.strokeRect(ipx + 1, ipy + 1, ts - 1, ts - 1);
+            ctx.fillStyle   = '#ffffff';
+            ctx.font        = `bold 9px monospace`;
+            ctx.fillText(String(tileId), ipx + 2, ipy + 11);
+            ctx.restore();
+        }
+
         // ── Procedural fallback ────────────────────────────────────
         // Sheet not yet loaded for this tile type → use existing _tc cache.
         this._drawProcedural(ctx, tileId, ipx, ipy, tx, ty, mapCtx, ts);
@@ -458,6 +478,14 @@ class SpriteRenderer {
             rect.sx, rect.sy, rect.sw, rect.sh,   // source rect (native px)
             0,       0,       ts,      ts           // destination (scaled to ts×ts)
         );
+
+        // Transparency guard — if the source region was empty/transparent the
+        // canvas is technically valid but draws nothing, which would block the
+        // procedural fallback.  Compute mean alpha; treat < 10 as "no tile here".
+        const data = ctx.getImageData(0, 0, ts, ts).data;
+        let totalAlpha = 0;
+        for (let i = 3; i < data.length; i += 4) totalAlpha += data[i];
+        if (totalAlpha / (ts * ts) < 10) return null;
 
         return c;
     }
