@@ -209,11 +209,12 @@ const VQ = (() => {
     //  of the tile, suggesting blade tips leaning in the wind.
     // ═══════════════════════════════════════════════════════════════
 
-    let _swayFrames = null;  // [variant 0-7][step 0-2] → HTMLCanvasElement
-    let _swayTS     = 0;     // TS at last build
-    let _swayStep   = 0;     // current animation step (0=neutral,1=right,2=left)
-    let _swayTimer  = 0;     // ms accumulator
-    let _swayLast   = 0;     // timeMs at last sway draw
+    let _swayFrames      = null;  // [variant 0-7][step 0-2] → HTMLCanvasElement
+    let _swayTS          = 0;     // TS at last build
+    let _swayStep        = 0;     // current animation step (0=neutral,1=right,2=left)
+    let _swayTimer       = 0;     // ms accumulator
+    let _swayLast        = 0;     // timeMs at last sway draw
+    let _swayBuiltWithAtlas = false; // true only when sway frames were baked from atlas sprites
 
     // Color grade gradient cache — createRadialGradient is non-trivial;
     // caching it per (cW×cH×mapType) avoids rebuilding it every frame.
@@ -224,6 +225,16 @@ const VQ = (() => {
         const sw  = Math.max(3, Math.floor(ts * 0.08));  // strip width
         const sh  = Math.floor(ts * 0.52);               // strip height (top portion)
 
+        // Determine whether the atlas renderer is ready to supply grass sprites.
+        // If not ready we skip building entirely — drawSwayPass() will retry next frame.
+        const atlasReady = (typeof spriteRenderer !== 'undefined') && spriteRenderer.isReady();
+        if (!atlasReady) {
+            _swayFrames         = null;
+            _swayBuiltWithAtlas = false;
+            _swayTS             = ts;
+            return;
+        }
+
         _swayFrames = [];
         for (let v = 0; v < 8; v++) {
             const frames = [];
@@ -233,13 +244,22 @@ const VQ = (() => {
                 const ctx2 = c.getContext('2d');
                 ctx2.imageSmoothingEnabled = false;
 
-                // Base: copy the static baked tile
-                ctx2.drawImage(_tc[`g${v}`], 0, 0, ts, ts);
+                // Base: use the atlas grass sprite so sway frames are visually
+                // identical to what bgCanvas already baked for this variant.
+                // Fall back to the procedural cache only if the atlas cut is absent.
+                let base = null;
+                try { base = spriteRenderer._getCachedVariant('GRASS', v, ts); }
+                catch (_) { /* atlas entry missing — will use procedural */ }
+                if (base) {
+                    ctx2.drawImage(base, 0, 0, ts, ts);
+                } else if (typeof _tc !== 'undefined' && _tc[`g${v}`]) {
+                    ctx2.drawImage(_tc[`g${v}`], 0, 0, ts, ts);
+                }
 
                 if (step !== 0) {
                     // step 1 = leaning right  → shadow on left,  light on right
                     // step 2 = leaning left   → shadow on right, light on left
-                    const shadowX = step === 1 ? 0    : ts - sw;
+                    const shadowX = step === 1 ? 0       : ts - sw;
                     const lightX  = step === 1 ? ts - sw : 0;
 
                     // Shadow strip (dark edge of leaning blades)
@@ -258,7 +278,8 @@ const VQ = (() => {
             }
             _swayFrames.push(frames);
         }
-        _swayTS = ts;
+        _swayTS             = ts;
+        _swayBuiltWithAtlas = true;
     }
 
     // Advance sway frame. Called once per drawSwayPass() invocation.
@@ -279,8 +300,15 @@ const VQ = (() => {
     function drawSwayPass() {
         if (!currentMap || currentMap.dark) return;
 
-        // Rebuild cache if TS changed (resize) or first run
-        if (!_swayFrames || _swayTS !== TS) _buildSway(TS);
+        // Rebuild if TS changed, first run, or atlas became ready after last bake.
+        // _buildSway() returns early (null frames) when atlas is not yet ready.
+        const atlasNowReady = (typeof spriteRenderer !== 'undefined') && spriteRenderer.isReady();
+        if (!_swayFrames || _swayTS !== TS || (!_swayBuiltWithAtlas && atlasNowReady)) {
+            _buildSway(TS);
+        }
+
+        // Do not draw procedural grass over atlas tiles — wait for atlas-baked frames.
+        if (!_swayBuiltWithAtlas) return;
 
         _advanceSway();
 
@@ -434,11 +462,12 @@ const VQ = (() => {
 
     // ─── invalidate — call on resize or TS change ─────────────────
     function invalidate() {
-        _swayFrames = null;
-        _swayTS     = 0;
-        _swayStep   = 0;
-        _swayTimer  = 0;
-        _cgGrd      = null; // canvas ctx recreated on resize — old gradient invalid
+        _swayFrames         = null;
+        _swayTS             = 0;
+        _swayStep           = 0;
+        _swayTimer          = 0;
+        _swayBuiltWithAtlas = false;
+        _cgGrd              = null; // canvas ctx recreated on resize — old gradient invalid
     }
 
     // ─── public API ───────────────────────────────────────────────
