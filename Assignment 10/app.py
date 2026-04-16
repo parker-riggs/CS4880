@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory
 from groq import Groq
 from dotenv import load_dotenv
 import os, io, asyncio, re, json
@@ -84,6 +84,11 @@ DEFAULT_PERSONALITY = """
 PERSONALITY: A villager of Eldoria — nervous, weathered by recent dark events, but trying to stay
 hopeful. Friendly enough, but distracted. Might share rumors or small observations about the village.
 """
+
+@app.route("/graphics/<path:filename>")
+def serve_graphics(filename):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), "graphics"), filename)
+
 
 @app.route("/")
 def index():
