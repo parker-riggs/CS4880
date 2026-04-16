@@ -57,14 +57,14 @@ const VQ = (() => {
         swayRadius: 7,     // tile radius around player to animate
 
         // Color grade
-        warmAlpha:  0.040, // warm screen overlay opacity
-        vigOutdoor: 0.14,  // vignette max-alpha outdoors
-        vigInterior:0.50,  // vignette max-alpha in buildings
-        vigDungeon: 0.64,  // vignette max-alpha in dark dungeons
+        warmAlpha:  0.055, // warm screen overlay opacity
+        vigOutdoor: 0.18,  // vignette max-alpha outdoors
+        vigInterior:0.54,  // vignette max-alpha in buildings
+        vigDungeon: 0.70,  // vignette max-alpha in dark dungeons
 
         // Outdoor torch
-        torchRadius: 3.6,  // torch glow radius in tile widths
-        torchAlpha:  0.09, // peak glow alpha (screen blend)
+        torchRadius: 4.8,  // torch glow radius in tile widths
+        torchAlpha:  0.13, // peak glow alpha (screen blend)
     };
 
     // ─── tile sets (lazily initialised after game.js defines TILE) ──
@@ -141,7 +141,8 @@ const VQ = (() => {
 
                 // ── Autotile blending — PATH side ─────────────────────
                 // The existing code already blends FROM the GRASS side.
-                // Here we add the matching blend from PATH facing GRASS/TREE.
+                // Here we add the matching blend from PATH facing GRASS/TREE,
+                // plus diagonal corner fills to remove bare notch artifacts.
                 if (tile === TILE.PATH) {
                     const dirs = [
                         [tx, ty - 1, 0],  // N edge of this tile
@@ -156,6 +157,23 @@ const VQ = (() => {
                         if (dir === 1) dither2(bgc, px, py + T - bw, T,  bw, P.M_SAND, P.M_FOREST, 0);
                         if (dir === 2) dither2(bgc, px, py,          bw, T,  P.M_SAND, P.M_FOREST, 1);
                         if (dir === 3) dither2(bgc, px + T - bw, py, bw, T,  P.M_SAND, P.M_FOREST, 0);
+                    }
+                    // Diagonal corner fills — prevent hard-cut notches at convex corners
+                    // where two cardinal blend strips would leave a bare pixel gap.
+                    const pathDiags = [
+                        [tx+1,ty-1, tx,  ty-1, tx+1,ty,   T-bw, 0    ], // NE
+                        [tx+1,ty+1, tx,  ty+1, tx+1,ty,   T-bw, T-bw ], // SE
+                        [tx-1,ty+1, tx,  ty+1, tx-1,ty,   0,    T-bw ], // SW
+                        [tx-1,ty-1, tx,  ty-1, tx-1,ty,   0,    0    ], // NW
+                    ];
+                    for (const [dnx,dny,a1x,a1y,a2x,a2y,cpx,cpy] of pathDiags) {
+                        const dt  = currentMap.tiles[dny]?.[dnx];
+                        if (dt !== TILE.GRASS && dt !== TILE.TREE) continue;
+                        const a1t = currentMap.tiles[a1y]?.[a1x];
+                        const a2t = currentMap.tiles[a2y]?.[a2x];
+                        // Only fill if neither adjacent cardinal is already blended
+                        if ((a1t===TILE.GRASS||a1t===TILE.TREE)||(a2t===TILE.GRASS||a2t===TILE.TREE)) continue;
+                        dither2(bgc, px+cpx, py+cpy, bw, bw, P.M_SAND, P.M_FOREST, 1);
                     }
                 }
 
@@ -327,8 +345,8 @@ const VQ = (() => {
         // ── Warm amber screen overlay ──────────────────────────────
         // Very subtle — α=0.04 shifts neutral greys ~4-8 points warmer.
         ctx.globalCompositeOperation = 'screen';
-        ctx.globalAlpha = isDark ? 0.018 : C.warmAlpha;
-        ctx.fillStyle   = '#ff9932'; // amber
+        ctx.globalAlpha = isDark ? 0.022 : C.warmAlpha;
+        ctx.fillStyle   = '#ffaa28'; // warm golden amber (richer than pure orange)
         ctx.fillRect(0, 0, cW, cH);
 
         // ── Vignette ───────────────────────────────────────────────
@@ -400,9 +418,10 @@ const VQ = (() => {
                 const fl  = C.torchAlpha + 0.028 * Math.sin(t * 10.5 + tx * 2.7 + ty * 1.3);
 
                 const g = ctx.createRadialGradient(lx, ly, 0, lx, ly, rad);
-                g.addColorStop(0,    `rgba(255,155,35,${fl * 2.4})`);
-                g.addColorStop(0.30, `rgba(220, 90,10,${fl * 1.3})`);
-                g.addColorStop(0.65, `rgba(160, 45, 0,${fl * 0.45})`);
+                g.addColorStop(0,    `rgba(255,165,45,${fl * 2.8})`);
+                g.addColorStop(0.25, `rgba(230,100,15,${fl * 1.6})`);
+                g.addColorStop(0.55, `rgba(180, 55, 0,${fl * 0.70})`);
+                g.addColorStop(0.85, `rgba(120, 30, 0,${fl * 0.22})`);
                 g.addColorStop(1,    'rgba(0,0,0,0)');
 
                 ctx.fillStyle = g;

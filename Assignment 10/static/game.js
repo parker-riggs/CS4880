@@ -1077,6 +1077,19 @@ function dither2(c, bx, by, bw, bh, col1, col2, offset) {
     }
 }
 
+// 25-percent density dither — paints col at every 4th pixel (Bayer-like pattern).
+// Used for the outer halo pass of autotile blending: creates a 3-step gradient
+// (solid border → 50% dither2 strip → 25% dither4 halo → clean tile interior).
+function dither4(c, bx, by, bw, bh, col, offset) {
+    const o = offset | 0;
+    c.fillStyle = col;
+    for (let y = by; y < by + bh; y++) {
+        for (let x = bx; x < bx + bw; x++) {
+            if (((x + y + o) & 3) === 0) c.fillRect(x, y, 1, 1);
+        }
+    }
+}
+
 function invalidateTileCache() { _tcTS = 0; }
 
 function ensureTileCache() {
@@ -1443,25 +1456,33 @@ function _buildTileCache() {
         _tc[`ceil${v}`] = can;
     }
 
-    // ── WATER  4 animation frames (flipbook @ 8fps = 125ms/frame) ─
-    for (let f = 0; f < 4; f++) {
+    // ── WATER  8 animation frames (flipbook @ ~12fps ≈ 83ms/frame) ─
+    // 8 frames gives a smoother 664ms cycle vs the previous 4-frame 500ms cycle.
+    for (let f = 0; f < 8; f++) {
         const can = _mkTile(), c = can.getContext('2d');
-        // Deep water base
+        // Deep base + dithered depth variation (alternates phase for shimmer)
         c.fillStyle = P.M_SLATE; c.fillRect(0, 0, T, T);
-        // Mid shimmer band shifts position each frame
-        const bandY = Math.floor(T*.32 + f*1.5);
-        c.fillStyle = P.L_WATER; c.fillRect(0, bandY, T, Math.floor(T*.22));
-        // 3 wave stripes, colour alternates by frame parity
+        dither2(c, 0, Math.floor(T*.50), T, Math.floor(T*.50), P.M_SLATE, P.M_TEAL, f&1);
+        // Mid shimmer band drifts upward across frames
+        const bandY = (Math.floor(T*.28) + f * Math.floor(T*.035)) % T;
+        c.fillStyle = P.L_WATER; c.fillRect(0, bandY, T, Math.floor(T*.18));
+        // 3 primary wave stripes (scroll 1px per frame)
         for (let i = 0; i < 3; i++) {
-            const wy = (Math.floor(T*.12 + i*(T/3.4) + f*2)) % T;
-            c.fillStyle = (i+f)%2===0 ? P.L_WATER : P.L_BLUE;
-            c.fillRect(Math.floor(T*.05), wy, Math.floor(T*.88), Math.max(1,Math.floor(T*.05)));
+            const wy = (Math.floor(T*.10 + i*(T/3.2)) + f) % T;
+            c.fillStyle = (i+Math.floor(f/2))%2===0 ? P.L_WATER : P.L_BLUE;
+            c.fillRect(Math.floor(T*.04), wy, Math.floor(T*.92), Math.max(1,Math.floor(T*.04)));
         }
-        // Shimmer glint blinks on even frames
-        if ((f&1)===0) {
+        // Secondary fine ripple layer (faster scroll — 1.5px per frame)
+        for (let i = 0; i < 2; i++) {
+            const wy2 = (Math.floor(i*(T*.48)) + Math.floor(f*1.5)) % T;
+            c.fillStyle = P.L_BLUE;
+            c.fillRect(Math.floor(T*.18), wy2, Math.floor(T*.64), 1);
+        }
+        // Specular glint appears every 4 frames, shifts position
+        if ((f&3)===0) {
             c.fillStyle = P.L_WHITE;
-            c.fillRect(Math.floor(T*.14), Math.floor(T*.18), 2, 1);
-            c.fillRect(Math.floor(T*.54), Math.floor(T*.42), 1, 1);
+            c.fillRect(f===0?Math.floor(T*.14):Math.floor(T*.56), Math.floor(T*.17), 2, 1);
+            c.fillRect(Math.floor(T*.42), Math.floor(T*.43), 1, 1);
         }
         _tc[`wa${f}`] = can;
     }
@@ -1571,17 +1592,38 @@ function drawTile(tile, px, py, tx, ty) {
     switch (tile) {
         case TILE.GRASS: {
             ctx.drawImage(_tc[`g${(tx*7+ty*13)&7}`], ipx, ipy, S1, S1);
-            // Auto-tile edge blending: dithered 4px strip at grass→path/water boundaries
-            const stripW = Math.max(4, Math.floor(TS/8));
+            // Autotile edge blending: 2-pass progressive dither at grass→path/water borders.
+            // Pass 1 (sw wide, 50% density): hard blend zone at the edge.
+            // Pass 2 (sw2 wide, 25% density): soft halo just beyond, creating a 3-step gradient.
+            const sw  = Math.max(4, Math.floor(TS/8));
+            const sw2 = Math.max(2, Math.floor(sw * .65));
             const blendNeighbors = [[tx,ty-1,0],[tx,ty+1,1],[tx-1,ty,2],[tx+1,ty,3]];
             for (const [ntx,nty,dir] of blendNeighbors) {
                 const nt = currentMap.tiles[nty]?.[ntx];
                 if (nt!==TILE.PATH && nt!==TILE.WATER) continue;
                 const bCol = nt===TILE.WATER ? PALETTE.M_SLATE : PALETTE.M_CLAY;
-                if (dir===0) dither2(ctx, ipx, ipy,               TS, stripW, PALETTE.M_FOREST, bCol, 0);
-                if (dir===1) dither2(ctx, ipx, ipy+TS-stripW,     TS, stripW, PALETTE.M_FOREST, bCol, 1);
-                if (dir===2) dither2(ctx, ipx, ipy,               stripW, TS, PALETTE.M_FOREST, bCol, 0);
-                if (dir===3) dither2(ctx, ipx+TS-stripW, ipy,     stripW, TS, PALETTE.M_FOREST, bCol, 1);
+                if (dir===0) { dither2(ctx,ipx,ipy,              TS,sw, PALETTE.M_FOREST,bCol,0); dither4(ctx,ipx,ipy+sw,            TS,sw2,bCol,0); }
+                if (dir===1) { dither2(ctx,ipx,ipy+TS-sw,        TS,sw, PALETTE.M_FOREST,bCol,1); dither4(ctx,ipx,ipy+TS-sw-sw2,     TS,sw2,bCol,1); }
+                if (dir===2) { dither2(ctx,ipx,ipy,              sw,TS, PALETTE.M_FOREST,bCol,0); dither4(ctx,ipx+sw,ipy,            sw2,TS,bCol,0); }
+                if (dir===3) { dither2(ctx,ipx+TS-sw,ipy,        sw,TS, PALETTE.M_FOREST,bCol,1); dither4(ctx,ipx+TS-sw-sw2,ipy,     sw2,TS,bCol,1); }
+            }
+            // Diagonal corner fill — draws a dither patch at convex corners where two
+            // cardinal blend strips would otherwise leave a bare notch.
+            // Only fires when neither adjacent cardinal is already blended (avoids double draw).
+            const grassDiags = [
+                [tx+1,ty-1, tx,  ty-1, tx+1,ty,   TS-sw, 0     ], // NE
+                [tx+1,ty+1, tx,  ty+1, tx+1,ty,   TS-sw, TS-sw ], // SE
+                [tx-1,ty+1, tx,  ty+1, tx-1,ty,   0,     TS-sw ], // SW
+                [tx-1,ty-1, tx,  ty-1, tx-1,ty,   0,     0     ], // NW
+            ];
+            for (const [dnx,dny,a1x,a1y,a2x,a2y,cpx,cpy] of grassDiags) {
+                const dt  = currentMap.tiles[dny ]?.[dnx];
+                if (dt!==TILE.PATH && dt!==TILE.WATER) continue;
+                const a1t = currentMap.tiles[a1y]?.[a1x];
+                const a2t = currentMap.tiles[a2y]?.[a2x];
+                if ((a1t===TILE.PATH||a1t===TILE.WATER)||(a2t===TILE.PATH||a2t===TILE.WATER)) continue;
+                const bCol = dt===TILE.WATER ? PALETTE.M_SLATE : PALETTE.M_CLAY;
+                dither2(ctx, ipx+cpx, ipy+cpy, sw, sw, PALETTE.M_FOREST, bCol, 0);
             }
             break;
         }
@@ -1778,8 +1820,8 @@ function drawTree(px, py, tx, ty) {
 
 function drawWater(px, py) {
     const ipx = Math.floor(px), ipy = Math.floor(py);
-    // Blit pre-rendered flipbook frame (8fps = 125ms per frame)
-    const frame = Math.floor(timeMs / 125) & 3;
+    // Blit pre-rendered flipbook frame (~12fps = 83ms per frame, 8-frame cycle)
+    const frame = Math.floor(timeMs / 83) & 7;
     ctx.drawImage(_tc[`wa${frame}`], ipx, ipy, TS+1, TS+1);
     // Live lily pad (anchored by tile-seed so same pad each frame)
     const txw = Math.round(px/TS), tyw = Math.round(py/TS);
@@ -2418,7 +2460,7 @@ function renderLighting() {
     for (let ty=sty;ty<=ety;ty++) for (let tx=stx;tx<=etx;tx++) {
         if (currentMap.tiles[ty][tx]===TILE.TORCH) {
             const lx=tx*TS-cam.x+TS/2, ly=ty*TS-cam.y+TS/2;
-            punch(lx,ly, TS*5, 0.98, t*10.5+tx*2.7+ty*1.3, 0.10);
+            punch(lx,ly, TS*6.5, 0.98, t*10.5+tx*2.7+ty*1.3, 0.12);
             _torchBuf.push(lx, ly, tx, ty);
         }
     }
@@ -2431,12 +2473,13 @@ function renderLighting() {
     ctx.save(); ctx.globalCompositeOperation='screen';
     for (let i=0; i<_torchBuf.length; i+=4) {
         const lx=_torchBuf[i], ly=_torchBuf[i+1], tx=_torchBuf[i+2];
-        const fl=0.11+0.04*Math.sin(t*10.5+tx*2.7);
-        const g=ctx.createRadialGradient(lx,ly,0,lx,ly,TS*4);
-        g.addColorStop(0,`rgba(255,130,20,${fl*1.9})`);
-        g.addColorStop(0.45,`rgba(200,65,5,${fl})`);
-        g.addColorStop(1,'rgba(0,0,0,0)');
-        ctx.fillStyle=g; ctx.fillRect(lx-TS*4.5,ly-TS*4.5,TS*9,TS*9);
+        const fl=0.13+0.05*Math.sin(t*10.5+tx*2.7);
+        const g=ctx.createRadialGradient(lx,ly,0,lx,ly,TS*5.5);
+        g.addColorStop(0,    `rgba(255,155,35,${fl*2.4})`);
+        g.addColorStop(0.35, `rgba(220, 85,10,${fl*1.3})`);
+        g.addColorStop(0.70, `rgba(160, 40, 0,${fl*0.45})`);
+        g.addColorStop(1,    'rgba(0,0,0,0)');
+        ctx.fillStyle=g; ctx.fillRect(lx-TS*6,ly-TS*6,TS*12,TS*12);
     }
     ctx.restore();
 }
