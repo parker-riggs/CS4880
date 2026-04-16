@@ -9,7 +9,12 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+def _get_groq():
+    key = os.getenv("GROQ_API_KEY")
+    if not key:
+        raise RuntimeError("GROQ_API_KEY environment variable is not set")
+    return Groq(api_key=key)
 
 # ── NPC Dialogue ──────────────────────────────────────────────────────────────
 
@@ -141,7 +146,7 @@ RULES:
     else:
         history.append({"role": "user", "content": player_text})
 
-    response = client.chat.completions.create(
+    response = _get_groq().chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=history,
         max_tokens=120,
