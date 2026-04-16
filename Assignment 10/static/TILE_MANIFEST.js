@@ -174,53 +174,63 @@ const TILE_MANIFEST = {
     },
 
     // ─────────────────────────────────────────────────────────────
-    //  WALL_EXT — exterior stone  (TILE.WALL, outdoor map)
+    //  WALL_EXT — exterior building wall  (TILE.WALL, outdoor map)
+    //  Row 10 col 1-4: warm khaki/beige stone — 256/256 opaque.
+    //  Verified: rgb(132,131,105) (164,161,124) (159,164,121) (131,134,105)
     // ─────────────────────────────────────────────────────────────
     WALL_EXT: {
         ids: [
-            'building_row10_col0',   // 0
-            'building_row10_col1',   // 1
-            'building_row10_col2',   // 2
-            'building_row10_col3',   // 3
+            'building_row10_col1',   // 0 — neutral khaki stone (256 opaque)
+            'building_row10_col2',   // 1 — lighter khaki stone (256 opaque)
+            'building_row10_col3',   // 2 — light olive-tan (256 opaque)
+            'building_row10_col4',   // 3 — khaki stone variant (256 opaque)
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
-    //  WALL_INT — interior wall  (TILE.WALL, interior map)
+    //  WALL_INT — interior wood wall  (TILE.WALL, interior map)
+    //  Row 13 col 5-8: warm brownish wood — opaque enough for walls.
+    //  Avoid col 2 (rgb 183,222,185 = bright green vegetation tile).
+    //  Verified: rgb(132,110,101) (132,110,100) (156,116,88) (155,119,95)
     // ─────────────────────────────────────────────────────────────
     WALL_INT: {
         ids: [
-            'building_row13_col0',   // 0
-            'building_row13_col1',   // 1
-            'building_row13_col2',   // 2
-            'building_row13_col5',   // 3
+            'building_row13_col5',   // 0 — warm brown wood
+            'building_row13_col6',   // 1 — warm brown wood variant
+            'building_row13_col7',   // 2 — rich warm brown
+            'building_row13_col8',   // 3 — warm brown plank
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
-    //  WALL_DUN — dungeon hewn rock  (TILE.WALL, dark map)
+    //  WALL_DUN — dungeon stone  (TILE.WALL, dark map)
+    //  Row 14 col 0,1,3,4: grey/dark stone tones.
+    //  Avoid col 2 (rgb 183,222,185 = bright green vegetation tile).
+    //  Verified: rgb(100,98,87) (121,115,101) (134,117,110) (129,106,97)
     // ─────────────────────────────────────────────────────────────
     WALL_DUN: {
         ids: [
-            'building_row14_col0',   // 0
-            'building_row14_col1',   // 1
-            'building_row14_col2',   // 2
-            'building_row14_col3',   // 3
+            'building_row14_col0',   // 0 — dark grey stone
+            'building_row14_col1',   // 1 — medium grey stone
+            'building_row14_col3',   // 2 — warm stone
+            'building_row14_col4',   // 3 — brownish stone
         ],
         fallback: 'procedural',
     },
 
     // ─────────────────────────────────────────────────────────────
     //  CEILING — interior overhead  (TILE.WALL, isCeiling=true)
+    //  Row 15 col 0-3: warm tan/brown roof material.
+    //  Verified: rgb(116,101,73) (116,102,99) (116,112,99) (108,104,91)
     // ─────────────────────────────────────────────────────────────
     CEILING: {
         ids: [
-            'building_row15_col0',   // 0
-            'building_row15_col1',   // 1
-            'building_row15_col10',  // 2
-            'building_row15_col11',  // 3
+            'building_row15_col0',   // 0 — warm brown roof
+            'building_row15_col1',   // 1 — warm tan roof
+            'building_row15_col2',   // 2 — neutral tan roof
+            'building_row15_col3',   // 3 — neutral stone roof
         ],
         fallback: 'procedural',
     },

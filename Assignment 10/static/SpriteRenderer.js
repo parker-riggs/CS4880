@@ -353,7 +353,7 @@ class SpriteRenderer {
 
         // ── Debug overlay ─────────────────────────────────────────
         // When DEBUG_TILES is true, flag every tile that missed the sprite path
-        // (sheet loaded but coords returned transparent, or tileId not covered).
+        // (atlas entry missing, image failed to load, or region was transparent).
         if (DEBUG_TILES) {
             ctx.save();
             ctx.fillStyle   = 'rgba(255,0,0,0.30)';
@@ -366,10 +366,9 @@ class SpriteRenderer {
             ctx.fillText(String(tileId), ipx + 2, ipy + 11);
             ctx.restore();
         }
-
-        // ── Procedural fallback ────────────────────────────────────
-        // Sheet not yet loaded for this tile type → use existing _tc cache.
-        this._drawProcedural(ctx, tileId, ipx, ipy, tx, ty, mapCtx, ts);
+        // Tile drew nothing — intentionally leave blank.
+        // Procedural fallback is permanently disabled: the atlas is the only
+        // source of tile graphics. Enable DEBUG_TILES above to find missing IDs.
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -420,9 +419,14 @@ class SpriteRenderer {
         }
 
         // All unique terrain image files are required before isReady()
+        // URL-encode each path segment so spaces (e.g. "Animated stuff") don't
+        // cause silent image-load failures in the browser.
         for (const file of files) {
             this._requiredKeys.add(file);
-            if (!this._images.has(file)) this._startLoad(file, '/' + file);
+            if (!this._images.has(file)) {
+                const url = '/' + file.split('/').map(seg => encodeURIComponent(seg)).join('/');
+                this._startLoad(file, url);
+            }
         }
     }
 
