@@ -86,7 +86,10 @@ const VQ = (() => {
     // Called at the end of rebuildBgCanvas(), while ctx is still redirected.
     // bgc  = bgCtx (passed explicitly — cleaner than relying on the ctx redirect)
     // stx…ety = the same visible tile range used by rebuildBgCanvas
-    function bakeAO(bgc, stx, sty, etx, ety) {
+    // bakeOffX / bakeOffY: pixel offset added to every draw coordinate so that AO
+    // gradients align correctly when bgCanvas is larger than the viewport (Fix 3).
+    // Callers that do not use a buffered canvas pass no arguments (defaults to 0).
+    function bakeAO(bgc, stx, sty, etx, ety, bakeOffX = 0, bakeOffY = 0) {
         _sets();
         const P  = PALETTE;
         const T  = TS;
@@ -97,8 +100,8 @@ const VQ = (() => {
                 const tile = currentMap.tiles[ty]?.[tx];
                 if (tile === undefined) continue;
 
-                const px = Math.floor(tx * T - cam.x);
-                const py = Math.floor(ty * T - cam.y);
+                const px = Math.floor(tx * T - cam.x) + bakeOffX;
+                const py = Math.floor(ty * T - cam.y) + bakeOffY;
 
                 // ── Ambient occlusion ─────────────────────────────────
                 if (_AO_RECV.has(tile)) {

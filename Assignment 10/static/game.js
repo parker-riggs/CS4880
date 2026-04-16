@@ -875,12 +875,8 @@ function resizeCanvas() {
     ctx.scale(dpr, dpr);
     ctx.imageSmoothingEnabled = false; // pixel-perfect — never blur tile art
 
-    // Match the bg offscreen canvas to the same logical size (no DPR needed —
-    // we blit it to ctx which is already DPR-scaled)
-    bgCanvas.width  = cW;
-    bgCanvas.height = cH;
-    bgCtx = bgCanvas.getContext('2d');
-    bgCtx.imageSmoothingEnabled = false;
+    // bgCanvas is sized to (cW + 4*TS) × (cH + 4*TS) by rebuildBgCanvas to hold
+    // a 2-tile scroll buffer on every edge.  Mark dirty; rebuild handles the resize.
     bgDirty = true;
 
     TS = Math.floor(Math.min(cW / 15, cH / 11));
@@ -1559,19 +1555,26 @@ function rebuildBgCanvas() {
     // Ensure variant indices are pre-computed (lazy — also covers dungeon rebuilds)
     if (!currentMap.variantMap) buildVariantMap(currentMap);
 
-    // Resize if needed (e.g. after a resize event before the first render)
-    if (bgCanvas.width !== cW || bgCanvas.height !== cH) {
-        bgCanvas.width  = cW;
-        bgCanvas.height = cH;
+    // 2-tile scroll buffer on every edge.
+    // bgCanvas covers world rect [cam.x-BUF .. cam.x+cW+BUF] × [cam.y-BUF .. cam.y+cH+BUF].
+    // The camera can pan up to BUF pixels in any direction without a rebuild.
+    const BUF = 2 * TS;
+    const bw  = cW + 2 * BUF;
+    const bh  = cH + 2 * BUF;
+
+    // Resize backing canvas when viewport or TS changes
+    if (bgCanvas.width !== bw || bgCanvas.height !== bh) {
+        bgCanvas.width  = bw;
+        bgCanvas.height = bh;
         bgCtx = bgCanvas.getContext('2d');
         bgCtx.imageSmoothingEnabled = false;
     }
 
-    // Clear
-    bgCtx.clearRect(0, 0, cW, cH);
+    // Clear full buffer
+    bgCtx.clearRect(0, 0, bw, bh);
     if (currentMap.dark) {
         bgCtx.fillStyle = PALETTE.MAP_DARK_BG;
-        bgCtx.fillRect(0, 0, cW, cH);
+        bgCtx.fillRect(0, 0, bw, bh);
     }
 
     // Temporarily redirect the global ctx so all drawTile() calls go to bgCtx
@@ -1579,20 +1582,22 @@ function rebuildBgCanvas() {
     ctx = bgCtx;
 
     ensureTileCache();
-    const stx = Math.max(0, Math.floor(cam.x / TS));
-    const sty = Math.max(0, Math.floor(cam.y / TS));
-    const etx = Math.min(currentMap.w - 1, Math.ceil((cam.x + cW) / TS));
-    const ety = Math.min(currentMap.h - 1, Math.ceil((cam.y + cH) / TS));
+    // Expand the tile range by the buffer on every side
+    const stx = Math.max(0,               Math.floor((cam.x - BUF) / TS));
+    const sty = Math.max(0,               Math.floor((cam.y - BUF) / TS));
+    const etx = Math.min(currentMap.w - 1, Math.ceil((cam.x + cW + BUF) / TS));
+    const ety = Math.min(currentMap.h - 1, Math.ceil((cam.y + cH + BUF) / TS));
     for (let ty = sty; ty <= ety; ty++) {
         for (let tx = stx; tx <= etx; tx++) {
             const tile = currentMap.tiles[ty][tx];
             if (ANIMATED_TILES.has(tile)) continue; // skip — drawn live each frame
-            drawTile(tile, tx * TS - cam.x, ty * TS - cam.y, tx, ty);
+            // Shift tile position by BUF so the buffer region sits off the left/top edge
+            drawTile(tile, tx * TS - cam.x + BUF, ty * TS - cam.y + BUF, tx, ty);
         }
     }
 
-    // Bake ambient occlusion + bilateral terrain blending on top of tiles
-    if (typeof VQ !== 'undefined') VQ.bakeAO(bgCtx, stx, sty, etx, ety);
+    // Bake AO with matching BUF offset so gradients align with the shifted tile positions
+    if (typeof VQ !== 'undefined') VQ.bakeAO(bgCtx, stx, sty, etx, ety, BUF, BUF);
 
     ctx = savedCtx; // restore main context
     bgDirty = false;
@@ -3349,10 +3354,13 @@ function render() {
     ctx.clearRect(0, 0, cW, cH);
 
     // ── Static tile layer (bgCanvas cache) ────────────────
-    // Invalidate whenever the camera has moved since the last bake
-    if (!bgDirty && (cam.x !== _bgCamX || cam.y !== _bgCamY)) bgDirty = true;
+    // Only rebuild when the camera has drifted beyond the 2-tile scroll buffer.
+    // Sub-buffer movement is free — just shift the blit offset.
+    const _bgBuf = 2 * TS;
+    if (!bgDirty && (Math.abs(cam.x - _bgCamX) >= _bgBuf || Math.abs(cam.y - _bgCamY) >= _bgBuf)) bgDirty = true;
     if (bgDirty) rebuildBgCanvas();
-    ctx.drawImage(bgCanvas, 0, 0);
+    // Draw bgCanvas offset so the buffer region is clipped off-screen
+    ctx.drawImage(bgCanvas, _bgCamX - cam.x - _bgBuf, _bgCamY - cam.y - _bgBuf);
 
     // ── Animated tile layer (water, stairs, torches) ──────
     drawAnimatedTiles();
