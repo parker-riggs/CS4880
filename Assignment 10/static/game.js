@@ -114,6 +114,255 @@ const { GRASS:G, PATH:P, FLOOR:F, WALL:W, TREE:TR,
         STAIRSUP:SU, TORCH:TC } = TILE;
 
 // ═══════════════════════════════════════════════════════
+//  BIOME NOISE HELPERS
+//  Pure value noise — no external dependencies.
+//  Used by buildVillageTiles() for organic biome shape
+//  generation.  All functions are pure (no side effects).
+// ═══════════════════════════════════════════════════════
+
+// Integer hash → float in [0,1)
+function _vhash(xi, yi, s) {
+    let n = (xi * 374761393 ^ yi * 668265263 ^ s * 1013904223) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1664525);
+    n = n ^ (n >>> 17);
+    n = Math.imul(n, 1013904223);
+    return (n >>> 0) / 4294967296;
+}
+// Bilinear value noise — single octave
+function _vnoise(x, y, seed) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const ux = fx * fx * (3 - 2 * fx);   // smoothstep
+    const uy = fy * fy * (3 - 2 * fy);
+    return _vhash(ix,   iy,   seed) * (1-ux) * (1-uy)
+         + _vhash(ix+1, iy,   seed) *    ux  * (1-uy)
+         + _vhash(ix,   iy+1, seed) * (1-ux) *    uy
+         + _vhash(ix+1, iy+1, seed) *    ux  *    uy;
+}
+// Fractional Brownian motion — multi-octave noise
+function _vfbm(x, y, seed, oct) {
+    let v = 0, a = 0.5, f = 1, m = 0;
+    for (let i = 0; i < oct; i++) {
+        v += _vnoise(x * f, y * f, seed + i * 97) * a;
+        m += a;  a *= 0.5;  f *= 2.1;
+    }
+    return v / m;
+}
+
+// Biome type constants — stored per-tile in map.biomeData (Uint8Array)
+const BIOME = Object.freeze({
+    VILLAGE:   0,   // sandy warm clearing — village buildings sit here
+    GRASSLAND: 1,   // open green grass fields
+    DIRT:      2,   // sparse sandy/dry clearings
+    FOREST:    3,   // dense tree canopy
+});
+
+// Set by buildVillageTiles(); attached to MAPS.village immediately after MAPS is defined
+let _villageBiomeData   = null;
+let _villageDecorations = null;
+let _villageWornPaths   = null;
+
+// ── Phase 3 helpers ─────────────────────────────────────────────────────────
+
+// Replace the uniform FOREST biome fill with organic tree clusters (3-8 tiles each).
+// Algorithm: jittered grid seeds cluster centres, randomised BFS grows each cluster
+// within FOREST biome only. All other FOREST tiles become walkable GRASS.
+function _placeTreeClusters(m, biome, W, H, rng) {
+    // Clear every FOREST-biome tile to GRASS so we start with a blank canvas.
+    for (let ty = 0; ty < H; ty++)
+        for (let tx = 0; tx < W; tx++)
+            if (biome[ty * W + tx] === BIOME.FOREST) m[ty][tx] = G;
+
+    const SPACING = 5;
+    const DIRS8 = [[0,-1],[1,0],[0,1],[-1,0],[-1,-1],[1,-1],[-1,1],[1,1]];
+    const marked = new Uint8Array(W * H);
+
+    // Jittered grid: one candidate per SPACING×SPACING cell
+    for (let gy = 0; gy < H; gy += SPACING) {
+        for (let gx = 0; gx < W; gx += SPACING) {
+            const cx = Math.min(W - 2, Math.floor(gx + rng() * SPACING));
+            const cy = Math.min(H - 2, Math.floor(gy + rng() * SPACING));
+            if (cx < 1 || cy < 1 || biome[cy * W + cx] !== BIOME.FOREST) continue;
+
+            const clusterSize = 3 + Math.floor(rng() * 6); // 3–8
+            const queue = [[cx, cy]];
+            let placed = 0;
+
+            while (queue.length > 0 && placed < clusterSize) {
+                const qi = Math.floor(rng() * queue.length);
+                const [tx, ty] = queue.splice(qi, 1)[0];
+                if (tx < 1 || tx >= W-1 || ty < 1 || ty >= H-1) continue;
+                if (biome[ty * W + tx] !== BIOME.FOREST) continue;
+                if (marked[ty * W + tx]) continue;
+
+                marked[ty * W + tx] = 1;
+                m[ty][tx] = TR;
+                placed++;
+
+                // Shuffle neighbours before enqueuing (Fisher-Yates)
+                const dirs = DIRS8.slice();
+                for (let i = dirs.length - 1; i > 0; i--) {
+                    const j = Math.floor(rng() * (i + 1));
+                    [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+                }
+                for (const [dx, dy] of dirs) {
+                    const nx = tx + dx, ny = ty + dy;
+                    if (nx > 0 && nx < W-1 && ny > 0 && ny < H-1
+                        && biome[ny * W + nx] === BIOME.FOREST
+                        && !marked[ny * W + nx])
+                        queue.push([nx, ny]);
+                }
+            }
+        }
+    }
+}
+
+// Scatter secondary decorations (stumps, bushes, small plants) based on
+// the final tile layout + biome data. Returns an array of
+// { tx, ty, type:'stump'|'bush'|'plant', variant:0..2 }.
+// Called at the END of buildVillageTiles() so road/building tiles are finalised.
+function _placeDecorations(m, biome, W, H, rng) {
+    const decs = [];
+    const tileAt = (ty, tx) => (ty >= 0 && ty < H && tx >= 0 && tx < W) ? m[ty][tx] : -1;
+    for (let ty = 1; ty < H - 1; ty++) {
+        for (let tx = 1; tx < W - 1; tx++) {
+            const tile = m[ty][tx];
+            const b    = biome[ty * W + tx];
+            if (tile === G && b === BIOME.FOREST) {
+                // GRASS tile inside forest biome = clearing/cluster edge
+                const adjTrees = (tileAt(ty-1,tx)===TR) + (tileAt(ty+1,tx)===TR)
+                                + (tileAt(ty,tx-1)===TR) + (tileAt(ty,tx+1)===TR);
+                if      (adjTrees > 0 && rng() < 0.22)
+                    decs.push({tx, ty, type:'stump', variant: Math.floor(rng() * 2)});
+                else if (adjTrees === 0 && rng() < 0.14)
+                    decs.push({tx, ty, type:'bush',  variant: Math.floor(rng() * 3)});
+            } else if (tile === G && b === BIOME.GRASSLAND) {
+                // Phase 5: noise-driven grass-colour patches for visual variation
+                const pn = _vfbm(tx * 0.45, ty * 0.45, 4447, 2);
+                if      (pn > 0.63) decs.push({tx, ty, type:'patch', variant:0}); // dark moss
+                else if (pn < 0.26) decs.push({tx, ty, type:'patch', variant:1}); // dry/light
+                else if (rng() < 0.07) decs.push({tx, ty, type:'plant', variant: Math.floor(rng() * 3)});
+            } else if (tile === P && b === BIOME.DIRT) {
+                // Phase 5: warm earth patches in sandy clearings
+                const pn = _vfbm(tx * 0.55, ty * 0.55, 7771, 2);
+                if      (pn > 0.60) decs.push({tx, ty, type:'patch', variant:2}); // warm earth
+                else if (rng() < 0.05) decs.push({tx, ty, type:'plant', variant: Math.floor(rng() * 2)});
+            }
+        }
+    }
+    return decs;
+}
+
+// Pixel-art draw for a single decoration at canvas position (px, py).
+// All geometry is derived from TS so it scales with the tile size.
+function _drawDecoration(ctx, px, py, type, variant, TS) {
+    const P = PALETTE;
+    const u  = Math.max(1, Math.round(TS / 16));
+    const ix = Math.round(px), iy = Math.round(py);
+
+    if (type === 'stump') {
+        const ox = ix + Math.round(TS * 0.30), oy = iy + Math.round(TS * 0.55);
+        const sw = u * 6, sh = u * 4;
+        ctx.fillStyle = P.D_BROWN;   ctx.fillRect(ox,        oy,        sw,        sh);
+        ctx.fillStyle = P.M_CLAY;    ctx.fillRect(ox + u,    oy,        sw - u*2,  sh - u);
+        ctx.fillStyle = P.L_PARCH;   ctx.fillRect(ox + u*2,  oy + u,    u,         u);
+        if (variant === 1) { ctx.fillStyle = P.M_MOSS; ctx.fillRect(ox + u, oy, sw - u*2, u); }
+
+    } else if (type === 'bush') {
+        const ox = ix + Math.round(TS * 0.18), oy = iy + Math.round(TS * 0.44);
+        const bw = u * 8;
+        ctx.fillStyle = P.D_GREEN;   ctx.fillRect(ox,        oy + u*3,  bw,        u*2);
+        ctx.fillStyle = P.M_FOREST;  ctx.fillRect(ox - u,    oy + u,    bw + u*2,  u*3);
+        ctx.fillStyle = (variant === 0) ? P.M_FOREST : P.L_LEAF;
+                                     ctx.fillRect(ox + u,    oy,        bw - u*2,  u*2);
+        ctx.fillStyle = P.L_LEAF;    ctx.fillRect(ox + u*2,  oy - u,    u*2,       u);
+        if (variant === 2) { ctx.fillStyle = P.A_RARE; ctx.fillRect(ox + u*3, oy, u, u); }
+
+    } else if (type === 'plant') {
+        const ox = ix + Math.round(TS * 0.40), oy = iy + Math.round(TS * 0.32);
+        if (variant === 0) {
+            ctx.fillStyle = P.M_MOSS;   ctx.fillRect(ox,      oy + u*2, u,    u*3);
+            ctx.fillStyle = P.M_FOREST; ctx.fillRect(ox - u,  oy + u,   u*2,  u);
+                                        ctx.fillRect(ox + u,  oy,       u*2,  u);
+        } else if (variant === 1) {
+            ctx.fillStyle = P.M_FOREST; ctx.fillRect(ox,      oy,       u,    u*5);
+                                        ctx.fillRect(ox - u,  oy + u,   u,    u*4);
+                                        ctx.fillRect(ox + u,  oy + u*2, u,    u*3);
+            ctx.fillStyle = P.L_LEAF;   ctx.fillRect(ox,      oy - u,   u,    u);
+                                        ctx.fillRect(ox - u,  oy,       u,    u);
+        } else {
+            ctx.fillStyle = P.L_LEAF;   ctx.fillRect(ox,      oy,       u*2,  u*2);
+                                        ctx.fillRect(ox + u*2, oy + u,  u*2,  u*2);
+                                        ctx.fillRect(ox - u,  oy + u,   u*2,  u*2);
+            ctx.fillStyle = P.M_MOSS;   ctx.fillRect(ox + u,  oy + u*3, u,    u*2);
+        }
+    } else if (type === 'patch') {
+        // Phase 5: full-tile tint overlay — subtle biome colour variation
+        //  variant 0 = dark moss  (darker grass interior patches)
+        //  variant 1 = dry/light  (warm sandy-ochre tone for dry grass)
+        //  variant 2 = warm earth (sandy PATH tiles in DIRT biome)
+        const patchColors  = [P.D_GREEN, P.M_SAND, P.M_CLAY];
+        const patchAlphas  = [0.22,      0.18,     0.18     ];
+        ctx.globalAlpha = patchAlphas[variant] ?? 0.20;
+        ctx.fillStyle   = patchColors[variant] ?? P.D_GREEN;
+        ctx.fillRect(ix, iy, TS, TS);
+        ctx.globalAlpha = 1;
+    }
+}
+
+
+// ── Phase 4: village transitional zone ──────────────────────────────────────
+// Creates the visual border between the sandy village and the outer biomes:
+//   • Road shoulders — PATH tiles 1-2 tiles off the main spines through grassland,
+//     making the approach routes look wide and worn rather than ruler-straight.
+//   • Scattered outpost trees — individual TR tiles at low probability across
+//     GRASSLAND, creating the sparse canopy seen between forest and settlement.
+// Called after _placeTreeClusters so it only modifies unmodified GRASS tiles.
+function _placeVillageTransition(m, biome, W, H, rng) {
+    for (let ty = 1; ty < H - 1; ty++) {
+        for (let tx = 1; tx < W - 1; tx++) {
+            if (biome[ty * W + tx] !== BIOME.GRASSLAND) continue;
+            if (m[ty][tx] !== G) continue; // only plain GRASS — skip roads/buildings
+
+            // Chebyshev distance to the main road spines (N-S x=21,22; E-W y=16,17)
+            const dNS = Math.min(Math.abs(tx - 21), Math.abs(tx - 22));
+            const dEW = Math.min(Math.abs(ty - 16), Math.abs(ty - 17));
+            const rd  = Math.min(dNS, dEW);
+
+            if      (rd === 1 && rng() < 0.42) m[ty][tx] = P;  // road shoulder
+            else if (rd === 2 && rng() < 0.16) m[ty][tx] = P;  // stray footpath
+            else if (rd > 3   && rng() < 0.09) m[ty][tx] = TR; // outpost tree
+        }
+    }
+}
+
+// ── Phase 5: worn-path classification ───────────────────────────────────────
+// Returns a Uint8Array (one byte per tile, same WxH layout as tiles).
+//   0 = no worn effect
+//   1 = main road spine (N-S or E-W) — subtle central lighter band
+//   2 = building connector (adjacent to a DOOR tile) — more prominent wear
+// Only PATH tiles receive non-zero values.
+function _buildWornPathMap(m, W, H) {
+    const worn = new Uint8Array(W * H);
+    for (let ty = 0; ty < H; ty++) {
+        for (let tx = 0; tx < W; tx++) {
+            if (m[ty][tx] !== P) continue;
+            if (tx === 21 || tx === 22 || ty === 16 || ty === 17) {
+                worn[ty * W + tx] = 1; // main spine
+                continue;
+            }
+            // Near a DOOR tile → high-traffic connector
+            if ((m[ty > 0     ? ty-1 : 0  ][tx] === DR) ||
+                (m[ty < H-1 ? ty+1 : H-1][tx] === DR) ||
+                (m[ty][tx > 0     ? tx-1 : 0  ] === DR) ||
+                (m[ty][tx < W-1 ? tx+1 : W-1] === DR))
+                worn[ty * W + tx] = 2;
+        }
+    }
+    return worn;
+}
+
+// ═══════════════════════════════════════════════════════
 //  MAP TILE DATA
 // ═══════════════════════════════════════════════════════
 function buildVillageTiles() {
@@ -123,21 +372,73 @@ function buildVillageTiles() {
     const fill = (x1,y1,x2,y2,t) => { for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++) s(x,y,t); };
     const house = (x1,y1,x2,y2) => { fill(x1,y1,x2,y2,W); };
 
-    // ── 1. Playable ground ───────────────────────────────────
-    fill(1,1,46,34, G);
+    // ── 1. Noise-based biome terrain ────────────────────────────────
+    //  Replaces the old rectangular fill + hand-placed tree blocks.
+    //  Every cell is assigned a BIOME type first, then mapped to a tile:
+    //    VILLAGE   → P  (sandy/warm dirt ground — matches reference art)
+    //    GRASSLAND → G  (rich green grass fields)
+    //    DIRT      → P  (sandy clearing — same tile, different variant via hash)
+    //    FOREST    → TR (tree canopy — buildings/roads placed below overwrite)
+    //
+    //  Three noise layers at different scales produce organically shaped
+    //  biome blobs.  Village center is forced by a radial distance falloff
+    //  so the clearing always surrounds the town buildings.  A feathered
+    //  transition ring (dist 0.25–0.44) blends village↔grassland using a
+    //  noise threshold that shifts with distance — 2-3 tile wide organic edge.
+    //
+    //  All generation is O(W_×H_) — completes in <1 ms at 48×36.
+    //  Output stored in _villageBiomeData, attached to MAPS.village below.
+    const _biome = new Uint8Array(W_ * H_);
+    for (let _ty = 0; _ty < H_; _ty++) {
+        for (let _tx = 0; _tx < W_; _tx++) {
+            // Normalised coords — centre = (0.5, 0.5)
+            const _nx = _tx / W_,  _ny = _ty / H_;
+            const _dx = _nx - 0.5, _dy = _ny - 0.5;
+            const _d  = Math.sqrt(_dx * _dx + _dy * _dy);
+
+            // Three independent noise fields
+            const _bn = _vfbm(_nx * 2.8, _ny * 2.8, 42,  4); // primary biome shape
+            const _fn = _vfbm(_nx * 3.5, _ny * 3.5, 239, 3); // forest clustering
+            const _dn = _vfbm(_nx * 5.2, _ny * 5.2, 571, 3); // dirt patch detail
+
+            let _b;
+            if (_tx === 0 || _tx === W_-1 || _ty === 0 || _ty === H_-1) {
+                _b = BIOME.FOREST;                              // 1-tile hard border
+            } else if (_d < 0.25) {
+                _b = BIOME.VILLAGE;                             // village core
+            } else if (_d < 0.44) {
+                // Feathered edge: noise threshold grows with distance so the
+                // transition is 2-3 tiles wide and organically shaped, never
+                // a hard circle or rectangle.
+                const _t = (_d - 0.25) / 0.19;                 // 0→1 across ring
+                _b = _bn > 0.43 + _t * 0.22 ? BIOME.VILLAGE : BIOME.GRASSLAND;
+            } else {
+                if      (_fn > 0.55)  _b = BIOME.FOREST;
+                else if (_dn < 0.32)  _b = BIOME.DIRT;
+                else                  _b = BIOME.GRASSLAND;
+            }
+
+            _biome[_ty * W_ + _tx] = _b;
+            m[_ty][_tx] = _b === BIOME.FOREST    ? TR :
+                          _b === BIOME.GRASSLAND  ? G  : P;
+        }
+    }
+    _villageBiomeData = _biome;
+
+    // ── 1b. Cluster tree placement ───────────────────────────────────────────
+    // Replace the solid FOREST-biome fill with organic clusters of 3-8 trees.
+    _placeTreeClusters(m, _biome, W_, H_, _rng(777));
+
+    // ── 1c. Village transitional zone (Phase 4) ───────────────────────────────
+    // Road shoulders and scattered outpost trees in the GRASSLAND ring.
+    // Must run AFTER _placeTreeClusters so it only touches unmodified GRASS.
+    _placeVillageTransition(m, _biome, W_, H_, _rng(551));
 
     // ── 2. Main roads ────────────────────────────────────────
     // N–S spine x=21,22; E–W spine y=16,17
     // All buildings stay clear of these columns/rows.
     fill(21,1,22,34, P);
     fill(1,16,46,17, P);
-
-    // ── 3. Decorative tree fills (placed before buildings so
-    //        buildings/paths naturally overwrite them) ────────
-    fill(31,2,32,11, TR);   // forest strip between Merchant and Blacksmith
-    fill(44,2,46,15, TR);   // east border fringe NE
-    fill(44,18,46,27, TR);  // east border fringe SE
-    fill(37,29,43,34, TR);  // SE corner south of chapel
 
     // ── 4. Pond (NW decorative water feature) ────────────────
     //  Water: x=13–19, y=3–12  (safely west of N–S road x=21)
@@ -225,6 +526,15 @@ function buildVillageTiles() {
     // ── 8. Dungeon stairs ────────────────────────────────────
     s(21,34, ST);
     s(22,34, ST);
+
+    // ── 9. Secondary decorations (Phase 3 + 5) ───────────────
+    // Run AFTER all roads/buildings are finalised so we never place a decoration
+    // under a WALL or on a PATH road tile.
+    _villageDecorations = _placeDecorations(m, _biome, W_, H_, _rng(913));
+
+    // ── 10. Worn-path map (Phase 5) ───────────────────────────
+    // Classify high-traffic PATH tiles for the lighter overlay drawn in bgCanvas.
+    _villageWornPaths = _buildWornPathMap(m, W_, H_);
 
     return m;
 }
@@ -682,6 +992,13 @@ const MAPS = {
         returnMap:'village', returnX:41, returnY:18,
     },
 };
+
+// Attach noise-generated biome data produced by buildVillageTiles()
+// Must be after MAPS so the object exists; biomeData is used by Phase 2+
+// decoration, transition tile selection, and cluster placement.
+MAPS.village.biomeData    = _villageBiomeData;
+MAPS.village.decorations  = _villageDecorations;
+MAPS.village.wornPaths    = _villageWornPaths;
 
 // ── Rebuild dungeon with fresh procedural generation ────
 function rebuildDungeon() {
@@ -1521,24 +1838,144 @@ function _buildTileCache() {
 //
 //  Packing (Uint8Array, one byte per tile):
 //    bits [3:0]  primary variant (grass 0-7, path/floor/wall 0-3)
-//    bits [5:4]  tree overlay variant (0-3, used only on TREE tiles)
+//    bits [5:4]  tree overlay variant (0-3, used only on TILE.TREE)
+//
+//  PHASE 2 ADDITION:
+//  When map.biomeData is present (village map), variant selection is
+//  biome-aware rather than pure hash:
+//
+//  GRASS tiles → cardinal forest-neighbor bitmask → _GRASS_EDGE_LUT
+//    selects the correct Serene-Village edge/corner tile variant so
+//    grass blends into forest with proper direction-aware sprites.
+//    Interior grass (no forest neighbors) rotates between variant 0/1.
+//
+//  PATH tiles → topology detection (N/S/E/W PATH neighbours)
+//    → dirt_path_cross / dirt_path_h / dirt_path_v / dirt_center
+//    so roads display correct directional sprites and open village
+//    ground shows a plain dirt_center tile.
+//
+//  All other tile types and all interior/dungeon maps keep the
+//  original hash arithmetic so nothing else is affected.
 // ═══════════════════════════════════════════════════════
+
+// Forest-neighbor bitmask → GRASS variant index (TILE_MANIFEST GRASS.ids)
+//   bits: 0=N forest  1=E forest  2=S forest  3=W forest
+//
+// Serene Village grass variants:
+//   0 grass_center   2 grass_top     4 grass_left    6 grass_corner_tl
+//   1 grass_center   3 grass_bottom  5 grass_right   7 grass_corner_tr
+const _GRASS_EDGE_LUT = new Uint8Array([
+//  0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15
+    0,   2,   5,   7,   3,   0,   0,   3,   4,   6,   0,   4,   0,   2,   5,   0,
+]);
+// Detailed mapping (bits: W=8 S=4 E=2 N=1):
+//   0  0000  no forest          → 0  grass_center (interior)
+//   1  0001  N only             → 2  grass_top
+//   2  0010  E only             → 5  grass_right
+//   3  0011  N+E forest         → 7  grass_corner_tr  (top-right outer corner)
+//   4  0100  S only             → 3  grass_bottom
+//   5  0101  N+S (strip)        → 0  center fallback
+//   6  0110  E+S                → 0  center fallback
+//   7  0111  N+E+S              → 3  grass_bottom  (W open → face W side)
+//   8  1000  W only             → 4  grass_left
+//   9  1001  N+W forest         → 6  grass_corner_tl  (top-left outer corner)
+//  10  1010  E+W (strip)        → 0  center fallback
+//  11  1011  N+E+W              → 4  grass_left    (S open → face S side)
+//  12  1100  S+W                → 0  center fallback
+//  13  1101  N+S+W              → 2  grass_top     (E open → face E side)
+//  14  1110  E+S+W              → 5  grass_right   (N open → face N side)
+//  15  1111  all forest         → 0  center (surrounded, rare)
+
 function buildVariantMap(map) {
-    const w = map.w, h = map.h;
+    const w  = map.w, h = map.h;
     const vm = new Uint8Array(w * h);
+    const bd = map.biomeData;   // Uint8Array | undefined — only set on village map
+
     for (let ty = 0; ty < h; ty++) {
         const row = map.tiles[ty];
         if (!row) continue;
         for (let tx = 0; tx < w; tx++) {
+            const tile = row[tx];
             let v = 0;
-            switch (row[tx]) {
-                case TILE.GRASS:  v = (tx * 7  + ty * 13) & 7;                                         break;
-                case TILE.TREE:   v = ((tx * 7 + ty * 13) & 7) | (((tx * 5 + ty * 9) & 3) << 4);      break;
-                case TILE.PATH:   v = (tx * 11 + ty * 7)  & 3;                                         break;
-                case TILE.FLOOR:  v = (tx * 5  + ty * 17) & 3;                                         break;
-                case TILE.WALL:   v = (tx * 3  + ty * 11) & 3;                                         break;
-                default:          v = 0;
+
+            if (bd) {
+                // ── Biome-aware selection (village map) ───────────────
+                // Helper: biome at (ty2,tx2), treats OOB as FOREST border
+                const B = (dy, dx) => {
+                    const ty2 = ty + dy, tx2 = tx + dx;
+                    return (ty2 < 0 || ty2 >= h || tx2 < 0 || tx2 >= w)
+                        ? BIOME.FOREST
+                        : bd[ty2 * w + tx2];
+                };
+                // Helper: tile type at (ty2,tx2), returns -1 for OOB
+                const T = (dy, dx) => {
+                    const ty2 = ty + dy, tx2 = tx + dx;
+                    if (ty2 < 0 || ty2 >= h || tx2 < 0 || tx2 >= w) return -1;
+                    return map.tiles[ty2]?.[tx2] ?? -1;
+                };
+
+                switch (tile) {
+
+                    case TILE.GRASS: {
+                        // Cardinal forest-neighbor bitmask → edge tile or interior
+                        const mask =
+                            ((B(-1,  0) === BIOME.FOREST) ? 1 : 0) |   // N
+                            ((B( 0, +1) === BIOME.FOREST) ? 2 : 0) |   // E
+                            ((B(+1,  0) === BIOME.FOREST) ? 4 : 0) |   // S
+                            ((B( 0, -1) === BIOME.FOREST) ? 8 : 0);    // W
+                        v = mask ? _GRASS_EDGE_LUT[mask]
+                                 : (tx * 7 + ty * 13) & 1; // interior: variant 0 or 1
+                        break;
+                    }
+
+                    case TILE.TREE: {
+                        // Preserve existing two-part packing:
+                        //   bits [3:0] = grass sub-variant (drawn under canopy)
+                        //   bits [5:4] = tree-canopy variant (0 or 1)
+                        v = ((tx * 7 + ty * 13) & 7)
+                          | (((tx * 5 + ty * 9) & 3) << 4);
+                        break;
+                    }
+
+                    case TILE.PATH: {
+                        // Topology-aware road detection:
+                        //   Directional road sprites where segments connect;
+                        //   plain dirt_center for isolated village ground.
+                        const pN = T(-1,  0) === TILE.PATH;
+                        const pE = T( 0, +1) === TILE.PATH;
+                        const pS = T(+1,  0) === TILE.PATH;
+                        const pW = T( 0, -1) === TILE.PATH;
+                        const axisV = pN || pS;
+                        const axisH = pE || pW;
+                        if      (axisV && axisH) v = 0; // dirt_path_cross  (intersection)
+                        else if (axisV)           v = 3; // dirt_path_v      (N–S segment)
+                        else if (axisH)           v = 2; // dirt_path_h      (E–W segment)
+                        else                      v = 1; // dirt_center      (open ground)
+                        break;
+                    }
+
+                    default: {
+                        // FLOOR, WALL, SIGN, etc. — unchanged hash arithmetic
+                        switch (tile) {
+                            case TILE.FLOOR: v = (tx * 5  + ty * 17) & 3; break;
+                            case TILE.WALL:  v = (tx * 3  + ty * 11) & 3; break;
+                            default:         v = 0;                        break;
+                        }
+                    }
+                }
+
+            } else {
+                // ── Hash fallback (dungeon / interior maps) ──────────
+                switch (tile) {
+                    case TILE.GRASS:  v = (tx * 7  + ty * 13) & 7;                                    break;
+                    case TILE.TREE:   v = ((tx * 7 + ty * 13) & 7) | (((tx * 5 + ty * 9) & 3) << 4); break;
+                    case TILE.PATH:   v = (tx * 11 + ty * 7)  & 3;                                    break;
+                    case TILE.FLOOR:  v = (tx * 5  + ty * 17) & 3;                                    break;
+                    case TILE.WALL:   v = (tx * 3  + ty * 11) & 3;                                    break;
+                    default:          v = 0;                                                            break;
+                }
             }
+
             vm[ty * w + tx] = v;
         }
     }
@@ -1598,6 +2035,45 @@ function rebuildBgCanvas() {
 
     // Bake AO with matching BUF offset so gradients align with the shifted tile positions
     if (typeof VQ !== 'undefined') VQ.bakeAO(bgCtx, stx, sty, etx, ety, BUF, BUF);
+
+    // ── Phase 3: draw secondary decorations (stumps, bushes, plants, patches) ──
+    // These sit on top of the baked tile layer but below entities/particles.
+    // 'patch' entries (Phase 5) are full-tile semi-transparent tints drawn here too.
+    if (currentMap.decorations && currentMap.decorations.length > 0) {
+        for (const dec of currentMap.decorations) {
+            if (dec.tx < stx || dec.tx >= etx || dec.ty < sty || dec.ty >= ety) continue;
+            const dpx = (dec.tx - stx) * TS + BUF;
+            const dpy = (dec.ty - sty) * TS + BUF;
+            _drawDecoration(bgCtx, dpx, dpy, dec.type, dec.variant, TS);
+        }
+    }
+
+    // ── Phase 5: worn-path overlay ─────────────────────────────────────────────
+    // A lighter central band drawn over high-traffic PATH tiles gives the roads
+    // a worn, sun-bleached appearance. Drawn after decorations so it's always
+    // the topmost static layer (entities and particles still render above this).
+    if (currentMap.wornPaths) {
+        const wp = currentMap.wornPaths;
+        const mw = currentMap.w;
+        for (let wty = sty; wty <= ety; wty++) {
+            for (let wtx = stx; wtx <= etx; wtx++) {
+                const level = wp[wty * mw + wtx];
+                if (!level) continue;
+                const wpx = (wtx - stx) * TS + BUF;
+                const wpy = (wty - sty) * TS + BUF;
+                const pad = Math.round(TS * 0.20);
+                bgCtx.globalAlpha = level === 2 ? 0.24 : 0.13;
+                bgCtx.fillStyle   = PALETTE.L_WHITE;
+                bgCtx.fillRect(Math.round(wpx + pad), Math.round(wpy + pad),
+                               TS - pad * 2, TS - pad * 2);
+                bgCtx.globalAlpha = 1;
+            }
+        }
+    }
+    // ── Phase 5 note: water animation ─────────────────────────────────────────
+    // TILE.WATER is in ANIMATED_TILES — it is NOT baked here. It is drawn live
+    // each frame by drawAnimatedTiles() which calls spriteRenderer.drawTile with
+    // the current _waterFrame (advanced at 4 fps by spriteRenderer.advanceAnimations).
 
     ctx = savedCtx; // restore main context
     bgDirty = false;
