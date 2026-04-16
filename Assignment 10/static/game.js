@@ -236,17 +236,27 @@ function _placeDecorations(m, biome, W, H, rng) {
                     decs.push({tx, ty, type:'stump', variant: Math.floor(rng() * 2)});
                 else if (adjTrees === 0 && rng() < 0.14)
                     decs.push({tx, ty, type:'bush',  variant: Math.floor(rng() * 3)});
-            } else if (tile === G && b === BIOME.GRASSLAND) {
-                // Phase 5: noise-driven grass-colour patches for visual variation
+            } else if (tile === P && b === BIOME.GRASSLAND) {
+                // Phase 1/5: noise-driven sandy ground variation on the open field.
+                // variant 0 = D_GREEN moss tint (near-forest warmth)
+                // variant 1 = M_SAND sandy highlight (lighter open patches)
                 const pn = _vfbm(tx * 0.45, ty * 0.45, 4447, 2);
-                if      (pn > 0.63) decs.push({tx, ty, type:'patch', variant:0}); // dark moss
-                else if (pn < 0.26) decs.push({tx, ty, type:'patch', variant:1}); // dry/light
+                if      (pn > 0.63) decs.push({tx, ty, type:'patch', variant:0}); // mossy shadow
+                else if (pn < 0.26) decs.push({tx, ty, type:'patch', variant:1}); // sandy highlight
                 else if (rng() < 0.07) decs.push({tx, ty, type:'plant', variant: Math.floor(rng() * 3)});
             } else if (tile === P && b === BIOME.DIRT) {
                 // Phase 5: warm earth patches in sandy clearings
                 const pn = _vfbm(tx * 0.55, ty * 0.55, 7771, 2);
                 if      (pn > 0.60) decs.push({tx, ty, type:'patch', variant:2}); // warm earth
                 else if (rng() < 0.05) decs.push({tx, ty, type:'plant', variant: Math.floor(rng() * 2)});
+            } else if (tile === P && b === BIOME.VILLAGE) {
+                // Phase 1: noise-driven tonal variation across the village sandy ground.
+                // Breaks up the flat monochrome appearance of the central clearing.
+                // variant 2 = M_CLAY darker worn patches (high-traffic areas)
+                // variant 1 = M_SAND lighter sandy highlights (undisturbed soil)
+                const pn = _vfbm(tx * 0.35, ty * 0.35, 2231, 3);
+                if      (pn > 0.65) decs.push({tx, ty, type:'patch', variant:2}); // worn/darker
+                else if (pn < 0.22) decs.push({tx, ty, type:'patch', variant:1}); // sandy/lighter
             }
         }
     }
@@ -311,6 +321,46 @@ function _drawDecoration(ctx, px, py, type, variant, TS) {
 }
 
 
+// ── Phase 1b: organic grass fringe ──────────────────────────────────────────
+// After the biome pass (all non-forest → P) and after tree cluster placement,
+// promote sandy PATH tiles that sit directly next to a tree tile into GRASS tiles.
+// This creates an organic green fringe at the forest boundary without any hard
+// rectangular border.
+//
+//   dist=1 (Chebyshev)  → always GRASS  (hard inner edge)
+//   dist=2              → GRASS if noise > 0.45  (soft organic outer ring)
+//
+// The result: sandy ground up to the forest, then a 1–2 tile green fringe,
+// then tree canopy — matching the reference palette exactly.
+function _placeGrassFringe(m, W, H) {
+    const isTree = (ty, tx) =>
+        ty >= 0 && ty < H && tx >= 0 && tx < W && m[ty][tx] === TR;
+
+    for (let ty = 1; ty < H - 1; ty++) {
+        for (let tx = 1; tx < W - 1; tx++) {
+            if (m[ty][tx] !== P) continue; // only promote open sandy ground
+
+            // Find nearest tree tile within Chebyshev radius 2
+            let minDist = 99;
+            for (let dy = -2; dy <= 2; dy++) {
+                for (let dx = -2; dx <= 2; dx++) {
+                    if (isTree(ty + dy, tx + dx))
+                        minDist = Math.min(minDist, Math.max(Math.abs(dx), Math.abs(dy)));
+                }
+            }
+
+            if      (minDist === 1) m[ty][tx] = G;  // always fringe
+            else if (minDist === 2) {
+                // Organic outer ring — use value noise so the edge is
+                // blobby rather than a perfect 2-tile border.
+                const n = _vfbm(tx * 0.60, ty * 0.60, 8831, 2);
+                if (n > 0.45) m[ty][tx] = G;
+            }
+        }
+    }
+}
+
+
 // ── Phase 4: village transitional zone ──────────────────────────────────────
 // Creates the visual border between the sandy village and the outer biomes:
 //   • Road shoulders — PATH tiles 1-2 tiles off the main spines through grassland,
@@ -322,7 +372,7 @@ function _placeVillageTransition(m, biome, W, H, rng) {
     for (let ty = 1; ty < H - 1; ty++) {
         for (let tx = 1; tx < W - 1; tx++) {
             if (biome[ty * W + tx] !== BIOME.GRASSLAND) continue;
-            if (m[ty][tx] !== G) continue; // only plain GRASS — skip roads/buildings
+            if (m[ty][tx] !== P) continue; // only open sandy ground — skip roads/buildings/fringe
 
             // Chebyshev distance to the main road spines (N-S x=21,22; E-W y=16,17)
             const dNS = Math.min(Math.abs(tx - 21), Math.abs(tx - 22));
@@ -419,8 +469,9 @@ function buildVillageTiles() {
             }
 
             _biome[_ty * W_ + _tx] = _b;
-            m[_ty][_tx] = _b === BIOME.FOREST    ? TR :
-                          _b === BIOME.GRASSLAND  ? G  : P;
+            // All non-forest biomes start as sandy PATH (warm dirt).
+            // Green GRASS is placed only at the forest fringe by _placeGrassFringe().
+            m[_ty][_tx] = _b === BIOME.FOREST ? TR : P;
         }
     }
     _villageBiomeData = _biome;
@@ -429,9 +480,14 @@ function buildVillageTiles() {
     // Replace the solid FOREST-biome fill with organic clusters of 3-8 trees.
     _placeTreeClusters(m, _biome, W_, H_, _rng(777));
 
-    // ── 1c. Village transitional zone (Phase 4) ───────────────────────────────
-    // Road shoulders and scattered outpost trees in the GRASSLAND ring.
-    // Must run AFTER _placeTreeClusters so it only touches unmodified GRASS.
+    // ── 1c. Organic grass fringe (Phase 1b) ──────────────────────────────────
+    // Promote sandy tiles that touch a tree tile into GRASS tiles.
+    // Runs AFTER _placeTreeClusters so tree positions are finalised.
+    _placeGrassFringe(m, W_, H_);
+
+    // ── 1d. Village transitional zone (Phase 4) ───────────────────────────────
+    // Scattered outpost trees in the sandy ring around the village.
+    // Must run AFTER _placeGrassFringe so it only touches unmodified PATH tiles.
     _placeVillageTransition(m, _biome, W_, H_, _rng(551));
 
     // ── 2. Main roads ────────────────────────────────────────
