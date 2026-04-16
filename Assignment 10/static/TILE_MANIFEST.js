@@ -175,15 +175,21 @@ const TILE_MANIFEST = {
 
     // ─────────────────────────────────────────────────────────────
     //  WALL_EXT — exterior building wall  (TILE.WALL, outdoor map)
-    //  Row 10 col 1-4: warm khaki/beige stone — 256/256 opaque.
-    //  Verified: rgb(132,131,105) (164,161,124) (159,164,121) (131,134,105)
+    //
+    //  Variants are position-aware (set by buildVariantMap Phase 2):
+    //    v=0  ROOF     row 22 col 0  rgb(252, 92, 70) — orange-red roof tile
+    //    v=1  BODY     row 23 col 0  rgb(224,184,112) — warm tan/ochre wall face
+    //    v=2  R-BORDER row 23 col 2  rgb( 70, 70, 94) — dark outline (right edge)
+    //    v=3  SHADOW   row 27 col 0  rgb(156,120,107) — darker foundation / south face
+    //
+    //  Colour-verified via pixel-sampling 2026-04-16.
     // ─────────────────────────────────────────────────────────────
     WALL_EXT: {
         ids: [
-            'building_row10_col1',   // 0 — neutral khaki stone (256 opaque)
-            'building_row10_col2',   // 1 — lighter khaki stone (256 opaque)
-            'building_row10_col3',   // 2 — light olive-tan (256 opaque)
-            'building_row10_col4',   // 3 — khaki stone variant (256 opaque)
+            'building_row22_col0',   // 0 — orange-red ROOF tile
+            'building_row23_col0',   // 1 — warm tan wall body
+            'building_row23_col2',   // 2 — dark right-edge border
+            'building_row27_col0',   // 3 — darker shadow/foundation row
         ],
         fallback: 'procedural',
     },

@@ -2010,11 +2010,37 @@ function buildVariantMap(map) {
                         break;
                     }
 
+                    case TILE.WALL: {
+                        // Position-aware building facade encoding.
+                        // The 4 variants map to facade regions so SpriteRenderer
+                        // can pick a different sprite for each part of the building:
+                        //
+                        //   v=0  roof     — no solid wall tile to the north
+                        //                   → orange roof tile, visually caps the top
+                        //   v=1  body     — wall tiles on all four sides
+                        //                   → warm tan/ochre wall face
+                        //   v=2  r-border — no solid wall tile to the east
+                        //                   → dark-border tile, draws the right outline
+                        //   v=3  shadow   — no solid wall tile to the south
+                        //                   → darker foundation tile, depth on south face
+                        //
+                        // DOOR tiles count as "solid" neighbours so the row above a
+                        // door arch does not incorrectly receive the shadow variant.
+                        const solid = t => t === TILE.WALL || t === TILE.DOOR;
+                        const wN = solid(T(-1,  0));
+                        const wS = solid(T(+1,  0));
+                        const wE = solid(T( 0, +1));
+                        if      (!wN) v = 0;  // top row   → roof
+                        else if (!wS) v = 3;  // bottom row → shadow/foundation
+                        else if (!wE) v = 2;  // right col  → dark outline
+                        else          v = 1;  // interior   → wall body
+                        break;
+                    }
+
                     default: {
-                        // FLOOR, WALL, SIGN, etc. — unchanged hash arithmetic
+                        // FLOOR, SIGN, etc. — hash arithmetic
                         switch (tile) {
                             case TILE.FLOOR: v = (tx * 5  + ty * 17) & 3; break;
-                            case TILE.WALL:  v = (tx * 3  + ty * 11) & 3; break;
                             default:         v = 0;                        break;
                         }
                     }
@@ -2086,6 +2112,38 @@ function rebuildBgCanvas() {
             if (ANIMATED_TILES.has(tile)) continue; // skip — drawn live each frame
             // Shift tile position by BUF so the buffer region sits off the left/top edge
             drawTile(tile, tx * TS - cam.x + BUF, ty * TS - cam.y + BUF, tx, ty);
+        }
+    }
+
+    // ── Phase 2: building dark outline pass ────────────────────────────────────
+    // For every exterior WALL tile on the outdoor map, stroke a dark band on each
+    // edge that borders non-wall ground. This gives buildings a clear black border
+    // that separates them from the sandy ground — matching the reference art.
+    //
+    // Only runs on the outdoor village map (returnMap = undefined, dark = false).
+    // Runs once per bgCanvas rebuild, not per frame — zero per-frame cost.
+    if (!currentMap.returnMap && !currentMap.dark) {
+        const outlineW = Math.max(2, Math.round(TS * 0.10)); // ≈10 % of tile
+        bgCtx.fillStyle = 'rgba(10,8,18,0.85)';
+        const solid = t => t === TILE.WALL || t === TILE.DOOR;
+        for (let ty = sty; ty <= ety; ty++) {
+            for (let tx = stx; tx <= etx; tx++) {
+                if (currentMap.tiles[ty][tx] !== TILE.WALL) continue;
+                const bpx = Math.round((tx - stx) * TS + BUF);
+                const bpy = Math.round((ty - sty) * TS + BUF);
+                // North border
+                if (!solid(currentMap.tiles[ty-1]?.[tx]))
+                    bgCtx.fillRect(bpx, bpy, TS, outlineW);
+                // South border
+                if (!solid(currentMap.tiles[ty+1]?.[tx]))
+                    bgCtx.fillRect(bpx, bpy + TS - outlineW, TS, outlineW);
+                // West border
+                if (!solid(currentMap.tiles[ty]?.[tx-1]))
+                    bgCtx.fillRect(bpx, bpy, outlineW, TS);
+                // East border
+                if (!solid(currentMap.tiles[ty]?.[tx+1]))
+                    bgCtx.fillRect(bpx + TS - outlineW, bpy, outlineW, TS);
+            }
         }
     }
 
