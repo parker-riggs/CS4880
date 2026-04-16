@@ -884,6 +884,8 @@ function resizeCanvas() {
     TS = Math.max(32, Math.min(TS, 64));
     lightCanvas = null; // force recreation at new size
     invalidateTileCache(); // rebuild tile variants at new TS
+    if (typeof VQ !== 'undefined') VQ.invalidate(); // rebuild sway frames at new TS
+    _invalidateVigGrd(); // vignette gradient is sized to cW/cH — must rebuild
 }
 window.addEventListener('resize', resizeCanvas);
 
@@ -892,11 +894,13 @@ window.addEventListener('resize', resizeCanvas);
 // ═══════════════════════════════════════════════════════
 const KEYS         = new Set();
 const JUST_PRESSED = new Set();
+// Module-level Set — avoids allocating a new array on every keydown event
+// and O(1) .has() vs O(n) .includes() scan.
+const _NAV_KEYS = new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);
 
 document.addEventListener('keydown', e => {
     if (document.activeElement?.tagName === 'INPUT') return;
-    const nav = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '];
-    if (nav.includes(e.key)) e.preventDefault();
+    if (_NAV_KEYS.has(e.key)) e.preventDefault();
     if (!KEYS.has(e.key)) JUST_PRESSED.add(e.key);
     KEYS.add(e.key);
     if (battle.active) { e.preventDefault(); handleBattleInput(e.key); return; }
@@ -1529,6 +1533,9 @@ function rebuildBgCanvas() {
         }
     }
 
+    // Bake ambient occlusion + bilateral terrain blending on top of tiles
+    if (typeof VQ !== 'undefined') VQ.bakeAO(bgCtx, stx, sty, etx, ety);
+
     ctx = savedCtx; // restore main context
     bgDirty = false;
     _bgCamX = cam.x;
@@ -1549,6 +1556,8 @@ function drawAnimatedTiles() {
             drawTile(tile, tx * TS - cam.x, ty * TS - cam.y, tx, ty);
         }
     }
+    // Grass sway — wind animation on tiles near the player
+    if (typeof VQ !== 'undefined') VQ.drawSwayPass();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2066,6 +2075,8 @@ function drawTorch(px, py, tx, ty) {
 // ═══════════════════════════════════════════════════════
 const PARTICLES = [];
 let _partTimer  = 0;
+// Per-type live counts — eliminates four .filter() calls in _spawnAmbient every 280ms.
+const _partCount = { firefly:0, dust:0, spark:0, leaf:0 };
 
 function spawnParticle(type, x, y) {
     const r = Math.random;
@@ -2075,6 +2086,7 @@ function spawnParticle(type, x, y) {
     else if (type==='spark') Object.assign(p,{vx:(r()-.5)*2.2,vy:-1.4-r()*2,maxLife:350+r()*500,size:1.5+r(),color:r()<.5?PALETTE.A_ORANGE:PALETTE.A_YELLOW});
     else if (type==='leaf')  Object.assign(p,{vx:.15+r()*.35,vy:.08+r()*.18,maxLife:6000+r()*4000,size:2+r(),color:r()<.5?PALETTE.S_DARK:PALETTE.M_CLAY,angle:r()*Math.PI*2,spin:(r()-.5)*.05});
     PARTICLES.push(p);
+    if (_partCount[type] !== undefined) _partCount[type]++;
 }
 
 function updateParticles(dt) {
@@ -2084,7 +2096,10 @@ function updateParticles(dt) {
     for (let i = PARTICLES.length-1; i >= 0; i--) {
         const p = PARTICLES[i];
         p.life += dt;
-        if (p.life >= p.maxLife) { PARTICLES.splice(i,1); continue; }
+        if (p.life >= p.maxLife) {
+            if (_partCount[p.type] !== undefined) _partCount[p.type]--;
+            PARTICLES.splice(i,1); continue;
+        }
         p.x += p.vx; p.y += p.vy;
         if (p.type==='firefly') {
             p.vx += (Math.random()-.5)*.024; p.vy += (Math.random()-.5)*.024;
@@ -2103,7 +2118,7 @@ function _spawnAmbient() {
     const maxR = 13;
     if (!currentMap.dark && !currentMap.returnMap) {
         // Outdoor — fireflies
-        if (PARTICLES.filter(p=>p.type==='firefly').length < 7) {
+        if (_partCount.firefly < 7) {
             const tx = Math.floor(player.x+(Math.random()-.5)*maxR*2);
             const ty = Math.floor(player.y+(Math.random()-.5)*maxR*2);
             const t  = currentMap.tiles[ty]?.[tx];
@@ -2111,7 +2126,7 @@ function _spawnAmbient() {
                 spawnParticle('firefly',(tx+Math.random())*TS,(ty+Math.random())*TS-TS*.3);
         }
         // Occasional leaf drift near trees
-        if (PARTICLES.filter(p=>p.type==='leaf').length < 4) {
+        if (_partCount.leaf < 4) {
             const tx = Math.floor(player.x+(Math.random()-.5)*maxR*2);
             const ty = Math.floor(player.y+(Math.random()-.5)*maxR*2);
             if (currentMap.tiles[ty]?.[tx]===TILE.TREE)
@@ -2119,14 +2134,14 @@ function _spawnAmbient() {
         }
     } else {
         // Dungeon / dark interior — dust motes
-        if (PARTICLES.filter(p=>p.type==='dust').length < 14)
+        if (_partCount.dust < 14)
             spawnParticle('dust',
                 (player.x+(Math.random()-.5)*maxR)*TS,
                 (player.y+(Math.random()-.5)*maxR)*TS);
     }
     // Forge sparks in blacksmith interior
     if (currentMap.id==='int_blacksmith') {
-        if (PARTICLES.filter(p=>p.type==='spark').length < 12)
+        if (_partCount.spark < 12)
             spawnParticle('spark', 11*TS+TS*.5, 1*TS+TS*.25);
     }
 }
@@ -2166,16 +2181,21 @@ function renderParticles() {
     ctx.restore();
 }
 
+// Cached gradient — recreated only on resize, not every frame.
+let _vigGrd = null, _vigGrdW = 0, _vigGrdH = 0;
+function _invalidateVigGrd() { _vigGrd = null; }
+
 function renderVignette() {
     // Soft corner darkening for interiors — makes small rooms feel enclosed
     if (!currentMap?.returnMap) return;
-    const grd = ctx.createRadialGradient(
-        cW/2, cH/2, Math.min(cW,cH)*.32,
-        cW/2, cH/2, Math.min(cW,cH)*.75
-    );
-    grd.addColorStop(0,'rgba(0,0,0,0)');
-    grd.addColorStop(1,'rgba(0,0,0,0.48)');
-    ctx.fillStyle = grd;
+    if (!_vigGrd || _vigGrdW !== cW || _vigGrdH !== cH) {
+        _vigGrd  = ctx.createRadialGradient(cW/2,cH/2,Math.min(cW,cH)*.32,
+                                             cW/2,cH/2,Math.min(cW,cH)*.75);
+        _vigGrd.addColorStop(0,'rgba(0,0,0,0)');
+        _vigGrd.addColorStop(1,'rgba(0,0,0,0.48)');
+        _vigGrdW = cW; _vigGrdH = cH;
+    }
+    ctx.fillStyle = _vigGrd;
     ctx.fillRect(0,0,cW,cH);
 }
 
@@ -2184,6 +2204,20 @@ function renderVignette() {
 // ═══════════════════════════════════════════════════════
 const CLASS_COLORS = {Warrior:PALETTE.CLASS_WARRIOR,Rogue:PALETTE.CLASS_ROGUE,Wizard:PALETTE.CLASS_WIZARD,Cleric:PALETTE.CLASS_CLERIC};
 const CLASS_CLOAK  = {Warrior:PALETTE.CLOAK_WARRIOR,Rogue:PALETTE.CLOAK_ROGUE,Wizard:PALETTE.CLOAK_WIZARD,Cleric:PALETTE.CLOAK_CLERIC};
+
+// ── Per-frame allocation fix ──────────────────────────────────────
+// These four lookup tables were previously declared as new objects inside
+// drawCharacter() and drawWeapon() on every call (every frame, every visible
+// character).  At 60fps with a player + ~10 NPCs that was ~200 object
+// allocations/frame driving GC pressure.  Hoisted here once at startup.
+const _CHAR_DIRS = Object.freeze({up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]});
+const _HEAD_OFF  = Object.freeze({up:[0,-.48],down:[0,.38],left:[-.42,0],right:[.42,0]});
+const _EYE_POS   = Object.freeze({
+    up:    Object.freeze([{x:-.15,y:-.18},{x:.15,y:-.18}]),
+    down:  Object.freeze([{x:-.15,y:.10}, {x:.15,y:.10} ]),
+    left:  Object.freeze([{x:-.18,y:-.08},{x:-.05,y:.10}]),
+    right: Object.freeze([{x:.18, y:-.08},{x:.05, y:.10}]),
+});
 
 function drawCharacter(sx, sy, color, facing, name, isPlayer, isNear, ghost, walkPhase=0, isMoving=false) {
     const cx=sx+TS/2, cy=sy+TS/2, r=TS*.28, t=timeMs/1000;
@@ -2199,8 +2233,7 @@ function drawCharacter(sx, sy, color, facing, name, isPlayer, isNear, ghost, wal
 
     // ── Feet / legs (drawn under body) ──────────────────
     {
-        const dirs = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
-        const [fdx,fdy] = dirs[facing] || [0,1];
+        const [fdx,fdy] = _CHAR_DIRS[facing] || _CHAR_DIRS.down;
         const [fpx,fpy] = [-fdy, fdx]; // perpendicular to facing
         const footR = r * 0.22;
         const footPhase = isPlayer ? walkPhase : idlePhase * 0.6;
@@ -2240,23 +2273,17 @@ function drawCharacter(sx, sy, color, facing, name, isPlayer, isNear, ghost, wal
         ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.arc(cx-r*.18,cy-r*.22,r*.18,0,Math.PI*2); ctx.fill();
     }
     // head
-    const hOff={up:[0,-.48],down:[0,.38],left:[-.42,0],right:[.42,0]};
-    const [hox,hoy]=hOff[facing]||[0,.38];
+    const [hox,hoy]=_HEAD_OFF[facing]||_HEAD_OFF.down;
     const hx=cx+hox*r, hy=cy+hoy*r;
     ctx.fillStyle=ghost?'#c0d0ff':'#e8cfa0';
     ctx.beginPath(); ctx.arc(hx,hy,r*.40,0,Math.PI*2); ctx.fill();
     ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1; ctx.stroke();
     // eyes (directional)
-    const eyePos={
-        up:   [{x:-.15,y:-.18},{x:.15,y:-.18}],
-        down: [{x:-.15,y:.10},{x:.15,y:.10}],
-        left: [{x:-.18,y:-.08},{x:-.05,y:.10}],
-        right:[{x:.18,y:-.08},{x:.05,y:.10}],
-    };
     ctx.fillStyle=ghost?'#a0c8ff':'#281808';
-    (eyePos[facing]||eyePos.down).forEach(e => {
-        ctx.beginPath(); ctx.arc(hx+e.x*r,hy+e.y*r,r*.10,0,Math.PI*2); ctx.fill();
-    });
+    const _ep=_EYE_POS[facing]||_EYE_POS.down;
+    for (let _ei=0;_ei<_ep.length;_ei++) {
+        ctx.beginPath(); ctx.arc(hx+_ep[_ei].x*r,hy+_ep[_ei].y*r,r*.10,0,Math.PI*2); ctx.fill();
+    }
     // class weapon (player only — only shown after the starter weapon is picked up)
     const hasWeapon = gs.inventory.some(i => i.questComplete === 'quest_weapon_complete');
     if (isPlayer&&!ghost&&hasWeapon) drawWeapon(cx,cy,r,facing);
@@ -2276,8 +2303,7 @@ function drawCharacter(sx, sy, color, facing, name, isPlayer, isNear, ghost, wal
 }
 
 function drawWeapon(cx, cy, r, facing) {
-    const dirs={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
-    const [dx,dy]=dirs[facing]||[0,1];
+    const [dx,dy]=_CHAR_DIRS[facing]||_CHAR_DIRS.down;
     const [px2,py2]=[-dy,dx]; // perpendicular
     const charClass=gs.charClass||'Warrior';
     const t=timeMs/1000;
@@ -2352,6 +2378,7 @@ function drawItem(item, sx, sy) {
 //  DYNAMIC LIGHTING
 // ═══════════════════════════════════════════════════════
 let lightCanvas = null, lightCtx2 = null;
+const _torchBuf = []; // reusable flat array [lx,ly,tx,ty,...] — avoids per-frame allocation
 
 function ensureLightCanvas() {
     if (!lightCanvas||lightCanvas.width!==cW||lightCanvas.height!==cH) {
@@ -2382,14 +2409,17 @@ function renderLighting() {
     // Player carries a dim ambient glow
     punch(player.x*TS-cam.x+TS/2, player.y*TS-cam.y+TS/2, TS*2.3, 0.52, t*5, 0.04);
 
-    // Scan visible tiles for torches
+    // Collect torch screen-positions in one pass; reuse for both the light punch
+    // and the warm color bleed — was previously two separate loops over ~500 tiles.
     const stx=Math.max(0,Math.floor(cam.x/TS)-2), sty=Math.max(0,Math.floor(cam.y/TS)-2);
     const etx=Math.min(currentMap.w-1,Math.ceil((cam.x+W)/TS)+2);
     const ety=Math.min(currentMap.h-1,Math.ceil((cam.y+H)/TS)+2);
+    _torchBuf.length = 0; // reuse module-level flat array: [lx0,ly0,tx0,ty0, lx1,...]
     for (let ty=sty;ty<=ety;ty++) for (let tx=stx;tx<=etx;tx++) {
         if (currentMap.tiles[ty][tx]===TILE.TORCH) {
             const lx=tx*TS-cam.x+TS/2, ly=ty*TS-cam.y+TS/2;
             punch(lx,ly, TS*5, 0.98, t*10.5+tx*2.7+ty*1.3, 0.10);
+            _torchBuf.push(lx, ly, tx, ty);
         }
     }
     lc.globalCompositeOperation='source-over';
@@ -2397,18 +2427,16 @@ function renderLighting() {
     // Draw darkness layer onto scene
     ctx.drawImage(lightCanvas,0,0);
 
-    // Warm color bleed at each torch (screen blend adds orange tint to lit areas)
+    // Warm color bleed — reuse collected positions, no second tile scan
     ctx.save(); ctx.globalCompositeOperation='screen';
-    for (let ty=sty;ty<=ety;ty++) for (let tx=stx;tx<=etx;tx++) {
-        if (currentMap.tiles[ty][tx]===TILE.TORCH) {
-            const lx=tx*TS-cam.x+TS/2, ly=ty*TS-cam.y+TS/2;
-            const fl=0.11+0.04*Math.sin(t*10.5+tx*2.7);
-            const g=ctx.createRadialGradient(lx,ly,0,lx,ly,TS*4);
-            g.addColorStop(0,`rgba(255,130,20,${fl*1.9})`);
-            g.addColorStop(0.45,`rgba(200,65,5,${fl})`);
-            g.addColorStop(1,'rgba(0,0,0,0)');
-            ctx.fillStyle=g; ctx.fillRect(lx-TS*4.5,ly-TS*4.5,TS*9,TS*9);
-        }
+    for (let i=0; i<_torchBuf.length; i+=4) {
+        const lx=_torchBuf[i], ly=_torchBuf[i+1], tx=_torchBuf[i+2];
+        const fl=0.11+0.04*Math.sin(t*10.5+tx*2.7);
+        const g=ctx.createRadialGradient(lx,ly,0,lx,ly,TS*4);
+        g.addColorStop(0,`rgba(255,130,20,${fl*1.9})`);
+        g.addColorStop(0.45,`rgba(200,65,5,${fl})`);
+        g.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=g; ctx.fillRect(lx-TS*4.5,ly-TS*4.5,TS*9,TS*9);
     }
     ctx.restore();
 }
@@ -3265,8 +3293,13 @@ function render() {
     renderParticles();  // ambient particles (fireflies, dust, sparks, leaves)
     renderLighting();   // dynamic darkness + torch light + warm color bleed
     renderVignette();   // corner vignette in interiors
+    if (typeof VQ !== 'undefined') {
+        VQ.renderOutdoorTorchGlow(); // torch warm halo on lit maps
+        VQ.renderColorGrade();       // warm tone + full-scene vignette
+    }
     if (battle.active) renderBattle();
     else updateHintBar();
+    _perf.draw(ctx, cW); // F3 toggles on-screen FPS counter (drawn last — above all other layers)
 }
 
 function isAdjacent(nx,ny){return Math.abs(nx-player.x)+Math.abs(ny-player.y)===1;}
@@ -3729,6 +3762,52 @@ document.getElementById('pause-mainmenu').addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════════════════
+//  PERFORMANCE MONITOR  (press F3 to toggle)
+// ═══════════════════════════════════════════════════════
+const _perf = (() => {
+    const SAMPLES = 60;
+    const frames  = new Float32Array(SAMPLES); // ring buffer — no GC
+    let   head    = 0, filled = 0, lastT = 0, visible = false;
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'F3') { e.preventDefault(); visible = !visible; }
+    });
+
+    return {
+        startFrame(ts) {
+            if (lastT) {
+                frames[head] = ts - lastT;
+                head = (head + 1) % SAMPLES;
+                if (filled < SAMPLES) filled++;
+            }
+            lastT = ts;
+        },
+        draw(ctx2, w) {
+            if (!visible || !filled) return;
+            let sum = 0, worst = 0;
+            for (let i = 0; i < filled; i++) {
+                const v = frames[i];
+                sum += v;
+                if (v > worst) worst = v;
+            }
+            const avg = sum / filled;
+            const fps = Math.round(1000 / avg);
+            const color = fps < 50 ? '#f44' : fps < 58 ? '#fa0' : '#4f4';
+            ctx2.save();
+            ctx2.font = 'bold 12px monospace';
+            ctx2.fillStyle = 'rgba(0,0,0,0.55)';
+            ctx2.fillRect(w - 282, 6, 276, 20);
+            ctx2.fillStyle = color;
+            ctx2.fillText(
+                `FPS: ${fps}  avg: ${avg.toFixed(1)}ms  worst: ${worst.toFixed(1)}ms`,
+                w - 278, 20
+            );
+            ctx2.restore();
+        },
+    };
+})();
+
+// ═══════════════════════════════════════════════════════
 //  GAME LOOP
 // ═══════════════════════════════════════════════════════
 // Fixed-timestep game loop — physics/logic always runs at 60 Hz regardless of
@@ -3738,6 +3817,7 @@ const FIXED_STEP = 1000 / 60; // ~16.667 ms
 let lastTs = 0, accumulator = 0;
 
 function loop(ts) {
+    _perf.startFrame(ts);
     const rawDt = ts - lastTs;
     lastTs = ts;
     timeMs = ts;
@@ -3755,6 +3835,10 @@ function loop(ts) {
         updateParticles(dt);
         accumulator -= FIXED_STEP;
     }
+    // Guard: if no fixed step ran this frame (accumulator too small),
+    // JUST_PRESSED would never be cleared — clearing here prevents a key
+    // press from being held over into a later frame and firing twice.
+    JUST_PRESSED.clear();
 
     render();
     requestAnimationFrame(loop);
