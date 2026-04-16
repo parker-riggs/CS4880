@@ -689,6 +689,7 @@ function rebuildDungeon() {
     const data = buildMineTiles(_rng(seed));
     const d = MAPS.dungeon_1;
     d.tiles = data.tiles;
+    d.variantMap = null; // tiles changed — rebuilt lazily on next rebuildBgCanvas
     d.w = data.w; d.h = data.h;
     d.playerStart = data.playerStart;
     d.signs = data.signs;
@@ -1004,6 +1005,7 @@ function handleStairsUp() {
 
 function changeMap(mapId, sx, sy) {
     currentMap = MAPS[mapId];
+    buildVariantMap(currentMap); // pre-compute tile variant indices for new map
     player.x   = sx !== undefined ? sx : currentMap.playerStart.x;
     player.y   = sy !== undefined ? sy : currentMap.playerStart.y;
     player.facing = 'down';
@@ -1518,12 +1520,45 @@ function _buildTileCache() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  VARIANT MAP  — bake tile variant indices at map-load time
+//  Eliminates per-frame hash arithmetic from the render loop.
+//
+//  Packing (Uint8Array, one byte per tile):
+//    bits [3:0]  primary variant (grass 0-7, path/floor/wall 0-3)
+//    bits [5:4]  tree overlay variant (0-3, used only on TREE tiles)
+// ═══════════════════════════════════════════════════════
+function buildVariantMap(map) {
+    const w = map.w, h = map.h;
+    const vm = new Uint8Array(w * h);
+    for (let ty = 0; ty < h; ty++) {
+        const row = map.tiles[ty];
+        if (!row) continue;
+        for (let tx = 0; tx < w; tx++) {
+            let v = 0;
+            switch (row[tx]) {
+                case TILE.GRASS:  v = (tx * 7  + ty * 13) & 7;                                         break;
+                case TILE.TREE:   v = ((tx * 7 + ty * 13) & 7) | (((tx * 5 + ty * 9) & 3) << 4);      break;
+                case TILE.PATH:   v = (tx * 11 + ty * 7)  & 3;                                         break;
+                case TILE.FLOOR:  v = (tx * 5  + ty * 17) & 3;                                         break;
+                case TILE.WALL:   v = (tx * 3  + ty * 11) & 3;                                         break;
+                default:          v = 0;
+            }
+            vm[ty * w + tx] = v;
+        }
+    }
+    map.variantMap = vm;
+}
+
+// ═══════════════════════════════════════════════════════
 //  BACKGROUND CACHE  — pre-bake all static tiles to bgCanvas
 // ═══════════════════════════════════════════════════════
 
 // Redirect the global `ctx` to bgCtx, draw all non-animated tiles, restore.
 // Called once per frame only when bgDirty is set (cam moved or map changed).
 function rebuildBgCanvas() {
+    // Ensure variant indices are pre-computed (lazy — also covers dungeon rebuilds)
+    if (!currentMap.variantMap) buildVariantMap(currentMap);
+
     // Resize if needed (e.g. after a resize event before the first render)
     if (bgCanvas.width !== cW || bgCanvas.height !== cH) {
         bgCanvas.width  = cW;
@@ -1608,7 +1643,8 @@ function drawTile(tile, px, py, tx, ty) {
     const S1 = TS + 1; // draw 1px over to close sub-pixel seams
     switch (tile) {
         case TILE.GRASS: {
-            ctx.drawImage(_tc[`g${(tx*7+ty*13)&7}`], ipx, ipy, S1, S1);
+            const _gv = currentMap.variantMap ? currentMap.variantMap[ty * currentMap.w + tx] & 7 : (tx*7+ty*13)&7;
+            ctx.drawImage(_tc[`g${_gv}`], ipx, ipy, S1, S1);
             // Autotile edge blending: dithered strip at grass→path/water borders
             const sw = Math.max(4, Math.floor(TS/8));
             const blendNeighbors = [[tx,ty-1,0],[tx,ty+1,1],[tx-1,ty,2],[tx+1,ty,3]];
@@ -1638,16 +1674,17 @@ function drawTile(tile, px, py, tx, ty) {
             break;
         }
         case TILE.PATH: {
-            ctx.drawImage(_tc[`p${(tx*11+ty*7)&3}`], ipx, ipy, S1, S1);
+            const _pv = currentMap.variantMap ? currentMap.variantMap[ty * currentMap.w + tx] & 3 : (tx*11+ty*7)&3;
+            ctx.drawImage(_tc[`p${_pv}`], ipx, ipy, S1, S1);
             break;
         }
         case TILE.FLOOR: {
-            const v = (tx*5+ty*17)&3;
+            const v = currentMap.variantMap ? currentMap.variantMap[ty * currentMap.w + tx] & 3 : (tx*5+ty*17)&3;
             ctx.drawImage(_tc[dark?`fd${v}`:`fl${v}`], ipx, ipy, S1, S1);
             break;
         }
         case TILE.WALL: {
-            const v = (tx*3+ty*11)&3;
+            const v = currentMap.variantMap ? currentMap.variantMap[ty * currentMap.w + tx] & 3 : (tx*3+ty*11)&3;
             // Ceiling: interior top row gets overhead beam tile instead of wall face
             if (!dark && currentMap.returnMap && ty === 0) {
                 ctx.drawImage(_tc[`ceil${v}`], ipx, ipy, S1, S1);
@@ -1658,7 +1695,8 @@ function drawTile(tile, px, py, tx, ty) {
             break;
         }
         case TILE.TREE: {
-            const gv = (tx*7+ty*13)&7, tv = (tx*5+ty*9)&3;
+            const _pk = currentMap.variantMap ? currentMap.variantMap[ty * currentMap.w + tx] : ((tx*7+ty*13)&7)|(((tx*5+ty*9)&3)<<4);
+            const gv = _pk & 7, tv = (_pk >> 4) & 3;
             ctx.drawImage(_tc[`g${gv}`], ipx, ipy, S1, S1);
             ctx.drawImage(_tc[`tr${tv}`], ipx, ipy, S1, S1);
             break;

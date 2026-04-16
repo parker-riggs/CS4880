@@ -243,7 +243,9 @@ class SpriteRenderer {
 
             // ── GRASS ─────────────────────────────────────────────
             case TILE.GRASS: {
-                const v  = (tx * 7 + ty * 13) & 7;
+                const v  = currentMap.variantMap
+                    ? currentMap.variantMap[ty * currentMap.w + tx] & 7
+                    : (tx * 7 + ty * 13) & 7;
                 const cv = this._getCachedVariant('GRASS', v, ts);
                 if (cv) { ctx.drawImage(cv, ipx, ipy, S1, S1); return; }
                 break;
@@ -251,7 +253,9 @@ class SpriteRenderer {
 
             // ── PATH ──────────────────────────────────────────────
             case TILE.PATH: {
-                const v  = (tx * 11 + ty * 7) & 3;
+                const v  = currentMap.variantMap
+                    ? currentMap.variantMap[ty * currentMap.w + tx] & 3
+                    : (tx * 11 + ty * 7) & 3;
                 const cv = this._getCachedVariant('PATH', v, ts);
                 if (cv) { ctx.drawImage(cv, ipx, ipy, S1, S1); return; }
                 break;
@@ -259,7 +263,9 @@ class SpriteRenderer {
 
             // ── FLOOR ─────────────────────────────────────────────
             case TILE.FLOOR: {
-                const v   = (tx * 5 + ty * 17) & 3;
+                const v   = currentMap.variantMap
+                    ? currentMap.variantMap[ty * currentMap.w + tx] & 3
+                    : (tx * 5 + ty * 17) & 3;
                 const key = mapCtx.dark ? 'FLOOR_DARK' : 'FLOOR_LIGHT';
                 const cv  = this._getCachedVariant(key, v, ts);
                 if (cv) { ctx.drawImage(cv, ipx, ipy, S1, S1); return; }
@@ -268,7 +274,9 @@ class SpriteRenderer {
 
             // ── WALL (context-dependent subtype) ──────────────────
             case TILE.WALL: {
-                const v   = (tx * 3 + ty * 11) & 3;
+                const v   = currentMap.variantMap
+                    ? currentMap.variantMap[ty * currentMap.w + tx] & 3
+                    : (tx * 3 + ty * 11) & 3;
                 const key = mapCtx.isCeiling  ? 'CEILING'
                           : mapCtx.dark       ? 'WALL_DUN'
                           : mapCtx.isInterior ? 'WALL_INT'
@@ -280,8 +288,11 @@ class SpriteRenderer {
 
             // ── TREE (composite: grass base + overlay) ────────────
             case TILE.TREE: {
-                const gv  = (tx * 7 + ty * 13) & 7;
-                const tv  = (tx * 5 + ty *  9) & 1;
+                const _p  = currentMap.variantMap
+                    ? currentMap.variantMap[ty * currentMap.w + tx]
+                    : ((tx * 7 + ty * 13) & 7) | (((tx * 5 + ty * 9) & 3) << 4);
+                const gv  = _p & 7;
+                const tv  = (_p >> 4) & 1;
                 const gcv = this._getCachedVariant('GRASS', gv, ts);
                 const tcv = this._getCachedVariant('TREE',  tv, ts);
                 // Draw both layers; fall through to procedural only if neither loaded

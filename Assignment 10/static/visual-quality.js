@@ -341,7 +341,9 @@ const VQ = (() => {
                 const localStep  = Math.floor((tBase + phase * 3) % 3);
                 if (localStep === 0) continue; // no overdraw for neutral frame
 
-                const v   = (tx * 7 + ty * 13) & 7;
+                const v   = currentMap.variantMap
+                    ? currentMap.variantMap[ty * currentMap.w + tx] & 7
+                    : (tx * 7 + ty * 13) & 7;
                 const spx = Math.floor(tx * TS - cam.x);
                 const spy = Math.floor(ty * TS - cam.y);
                 ctx.drawImage(frames[v][localStep], spx, spy, TS + 1, TS + 1);
